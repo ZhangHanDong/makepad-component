@@ -136,20 +136,20 @@ impl Widget for MpSwitch {
         match event.hits(cx, self.view.area()) {
             Hit::FingerHoverIn(_) => {
                 cx.set_cursor(MouseCursor::Hand);
-                self.animator_play(cx, id!(hover.on));
+                self.animator_play(cx, ids!(hover.on));
             }
             Hit::FingerHoverOut(_) => {
                 cx.set_cursor(MouseCursor::Default);
-                self.animator_play(cx, id!(hover.off));
+                self.animator_play(cx, ids!(hover.off));
             }
             Hit::FingerUp(fe) => {
                 if fe.is_over {
                     self.on = !self.on;
 
                     if self.on {
-                        self.animator_play(cx, id!(on.on));
+                        self.animator_play(cx, ids!(on.on));
                     } else {
-                        self.animator_play(cx, id!(on.off));
+                        self.animator_play(cx, ids!(on.off));
                     }
 
                     cx.widget_action(uid, &scope.path, MpSwitchAction::Changed(self.on));
@@ -163,10 +163,10 @@ impl Widget for MpSwitch {
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         // Sync initial state
         if self.on {
-            self.view.view(id!(track)).apply_over(cx, live! {
+            self.view.view(ids!(track)).apply_over(cx, live! {
                 draw_bg: { on: 1.0 }
             });
-            self.view.view(id!(thumb_wrap)).apply_over(cx, live! {
+            self.view.view(ids!(thumb_wrap)).apply_over(cx, live! {
                 align: { x: 1.0 }
             });
         }
@@ -183,9 +183,9 @@ impl MpSwitch {
     pub fn set_on(&mut self, cx: &mut Cx, on: bool) {
         self.on = on;
         if on {
-            self.animator_play(cx, id!(on.on));
+            self.animator_play(cx, ids!(on.on));
         } else {
-            self.animator_play(cx, id!(on.off));
+            self.animator_play(cx, ids!(on.off));
         }
         self.redraw(cx);
     }

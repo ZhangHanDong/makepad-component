@@ -136,17 +136,17 @@ impl Widget for MpRadio {
         match event.hits(cx, self.view.area()) {
             Hit::FingerHoverIn(_) => {
                 cx.set_cursor(MouseCursor::Hand);
-                self.animator_play(cx, id!(hover.on));
+                self.animator_play(cx, ids!(hover.on));
             }
             Hit::FingerHoverOut(_) => {
                 cx.set_cursor(MouseCursor::Default);
-                self.animator_play(cx, id!(hover.off));
+                self.animator_play(cx, ids!(hover.off));
             }
             Hit::FingerUp(fe) => {
                 if fe.is_over && !self.checked {
                     // Radio can only be checked, not unchecked by clicking
                     self.checked = true;
-                    self.animator_play(cx, id!(checked.on));
+                    self.animator_play(cx, ids!(checked.on));
                     cx.widget_action(uid, &scope.path, MpRadioAction::Changed(true));
                     self.redraw(cx);
                 }
@@ -158,12 +158,12 @@ impl Widget for MpRadio {
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         // Update label text
         if !self.text.as_ref().is_empty() {
-            self.view.label(id!(label)).set_text(cx, self.text.as_ref());
+            self.view.label(ids!(label)).set_text(cx, self.text.as_ref());
         }
 
         // Sync initial checked state
         if self.checked {
-            self.view.view(id!(radio_circle)).apply_over(cx, live! {
+            self.view.view(ids!(radio_circle)).apply_over(cx, live! {
                 draw_bg: { checked: 1.0 }
             });
         }
@@ -184,9 +184,9 @@ impl MpRadio {
     pub fn set_checked(&mut self, cx: &mut Cx, checked: bool) {
         self.checked = checked;
         if checked {
-            self.animator_play(cx, id!(checked.on));
+            self.animator_play(cx, ids!(checked.on));
         } else {
-            self.animator_play(cx, id!(checked.off));
+            self.animator_play(cx, ids!(checked.off));
         }
         self.redraw(cx);
     }

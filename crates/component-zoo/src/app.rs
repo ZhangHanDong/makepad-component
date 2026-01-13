@@ -1254,123 +1254,123 @@ impl MatchEvent for App {
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         // Handle counter button
-        if self.ui.mp_button(id!(counter_btn)).clicked(&actions) {
+        if self.ui.mp_button(ids!(counter_btn)).clicked(&actions) {
             self.counter += 1;
-            self.ui.label(id!(counter_label))
+            self.ui.label(ids!(counter_label))
                 .set_text(cx, &format!("Clicked: {} times", self.counter));
         }
 
         // Handle checkbox changes
-        if let Some(checked) = self.ui.mp_checkbox(id!(checkbox1)).changed(&actions) {
+        if let Some(checked) = self.ui.mp_checkbox(ids!(checkbox1)).changed(&actions) {
             self.update_checkbox_status(cx);
             log!("Checkbox 1 changed: {}", checked);
         }
-        if let Some(checked) = self.ui.mp_checkbox(id!(checkbox2)).changed(&actions) {
+        if let Some(checked) = self.ui.mp_checkbox(ids!(checkbox2)).changed(&actions) {
             self.update_checkbox_status(cx);
             log!("Checkbox 2 changed: {}", checked);
         }
-        if let Some(checked) = self.ui.mp_checkbox(id!(checkbox3)).changed(&actions) {
+        if let Some(checked) = self.ui.mp_checkbox(ids!(checkbox3)).changed(&actions) {
             self.update_checkbox_status(cx);
             log!("Checkbox 3 changed: {}", checked);
         }
 
         // Handle switch changes
-        if let Some(on) = self.ui.mp_switch(id!(switch_wifi)).changed(&actions) {
+        if let Some(on) = self.ui.mp_switch(ids!(switch_wifi)).changed(&actions) {
             log!("Wi-Fi: {}", if on { "ON" } else { "OFF" });
         }
-        if let Some(on) = self.ui.mp_switch(id!(switch_bluetooth)).changed(&actions) {
+        if let Some(on) = self.ui.mp_switch(ids!(switch_bluetooth)).changed(&actions) {
             log!("Bluetooth: {}", if on { "ON" } else { "OFF" });
         }
-        if let Some(on) = self.ui.mp_switch(id!(switch_notifications)).changed(&actions) {
+        if let Some(on) = self.ui.mp_switch(ids!(switch_notifications)).changed(&actions) {
             log!("Notifications: {}", if on { "ON" } else { "OFF" });
         }
 
         // Handle radio changes (mutually exclusive)
-        if self.ui.mp_radio(id!(radio_small)).changed(&actions).is_some() {
-            self.ui.mp_radio(id!(radio_medium)).set_checked(cx, false);
-            self.ui.mp_radio(id!(radio_large)).set_checked(cx, false);
-            self.ui.label(id!(radio_status)).set_text(cx, "Selected: Small");
+        if self.ui.mp_radio(ids!(radio_small)).changed(&actions).is_some() {
+            self.ui.mp_radio(ids!(radio_medium)).set_checked(cx, false);
+            self.ui.mp_radio(ids!(radio_large)).set_checked(cx, false);
+            self.ui.label(ids!(radio_status)).set_text(cx, "Selected: Small");
             log!("Radio: Small");
         }
-        if self.ui.mp_radio(id!(radio_medium)).changed(&actions).is_some() {
-            self.ui.mp_radio(id!(radio_small)).set_checked(cx, false);
-            self.ui.mp_radio(id!(radio_large)).set_checked(cx, false);
-            self.ui.label(id!(radio_status)).set_text(cx, "Selected: Medium");
+        if self.ui.mp_radio(ids!(radio_medium)).changed(&actions).is_some() {
+            self.ui.mp_radio(ids!(radio_small)).set_checked(cx, false);
+            self.ui.mp_radio(ids!(radio_large)).set_checked(cx, false);
+            self.ui.label(ids!(radio_status)).set_text(cx, "Selected: Medium");
             log!("Radio: Medium");
         }
-        if self.ui.mp_radio(id!(radio_large)).changed(&actions).is_some() {
-            self.ui.mp_radio(id!(radio_small)).set_checked(cx, false);
-            self.ui.mp_radio(id!(radio_medium)).set_checked(cx, false);
-            self.ui.label(id!(radio_status)).set_text(cx, "Selected: Large");
+        if self.ui.mp_radio(ids!(radio_large)).changed(&actions).is_some() {
+            self.ui.mp_radio(ids!(radio_small)).set_checked(cx, false);
+            self.ui.mp_radio(ids!(radio_medium)).set_checked(cx, false);
+            self.ui.label(ids!(radio_status)).set_text(cx, "Selected: Large");
             log!("Radio: Large");
         }
 
         // Handle progress buttons
-        if self.ui.mp_button(id!(progress_inc_btn)).clicked(&actions) {
-            let current = self.ui.mp_progress(id!(interactive_progress)).value();
+        if self.ui.mp_button(ids!(progress_inc_btn)).clicked(&actions) {
+            let current = self.ui.mp_progress(ids!(interactive_progress)).value();
             let new_value = (current + 10.0).min(100.0);
-            self.ui.mp_progress(id!(interactive_progress)).set_value(cx, new_value);
-            self.ui.label(id!(progress_label)).set_text(cx, &format!("{}%", new_value as i32));
+            self.ui.mp_progress(ids!(interactive_progress)).set_value(cx, new_value);
+            self.ui.label(ids!(progress_label)).set_text(cx, &format!("{}%", new_value as i32));
         }
-        if self.ui.mp_button(id!(progress_dec_btn)).clicked(&actions) {
-            let current = self.ui.mp_progress(id!(interactive_progress)).value();
+        if self.ui.mp_button(ids!(progress_dec_btn)).clicked(&actions) {
+            let current = self.ui.mp_progress(ids!(interactive_progress)).value();
             let new_value = (current - 10.0).max(0.0);
-            self.ui.mp_progress(id!(interactive_progress)).set_value(cx, new_value);
-            self.ui.label(id!(progress_label)).set_text(cx, &format!("{}%", new_value as i32));
+            self.ui.mp_progress(ids!(interactive_progress)).set_value(cx, new_value);
+            self.ui.label(ids!(progress_label)).set_text(cx, &format!("{}%", new_value as i32));
         }
 
         // Handle slider changes
-        if let Some(value) = self.ui.mp_slider(id!(slider_default)).changed(&actions) {
+        if let Some(value) = self.ui.mp_slider(ids!(slider_default)).changed(&actions) {
             let v = value.end();
-            self.ui.label(id!(slider_default_label)).set_text(cx, &format!("Value: {}", v as i32));
+            self.ui.label(ids!(slider_default_label)).set_text(cx, &format!("Value: {}", v as i32));
             log!("Slider value: {}", v);
         }
 
         // Handle range slider changes
-        if let Some(value) = self.ui.mp_slider(id!(slider_range)).changed(&actions) {
+        if let Some(value) = self.ui.mp_slider(ids!(slider_range)).changed(&actions) {
             let start = value.start();
             let end = value.end();
-            self.ui.label(id!(slider_range_label)).set_text(cx, &format!("Range: {} - {}", start as i32, end as i32));
+            self.ui.label(ids!(slider_range_label)).set_text(cx, &format!("Range: {} - {}", start as i32, end as i32));
             log!("Range slider: {} - {}", start, end);
         }
 
         // Handle logarithmic slider changes
-        if let Some(value) = self.ui.mp_slider(id!(slider_log)).changed(&actions) {
+        if let Some(value) = self.ui.mp_slider(ids!(slider_log)).changed(&actions) {
             let v = value.end();
-            self.ui.label(id!(slider_log_label)).set_text(cx, &format!("Value: {:.1}", v));
+            self.ui.label(ids!(slider_log_label)).set_text(cx, &format!("Value: {:.1}", v));
             log!("Log slider value: {}", v);
         }
 
         // Handle vertical slider changes
-        if let Some(value) = self.ui.mp_slider(id!(slider_vert)).changed(&actions) {
+        if let Some(value) = self.ui.mp_slider(ids!(slider_vert)).changed(&actions) {
             let v = value.end();
-            self.ui.label(id!(slider_vert_label)).set_text(cx, &format!("Vertical value: {}", v as i32));
+            self.ui.label(ids!(slider_vert_label)).set_text(cx, &format!("Vertical value: {}", v as i32));
             log!("Vertical slider value: {}", v);
         }
 
         // Handle input changes
-        if let Some(text) = self.ui.text_input(id!(input_interactive)).changed(&actions) {
+        if let Some(text) = self.ui.text_input(ids!(input_interactive)).changed(&actions) {
             let display = if text.is_empty() {
                 "Value: (empty)".to_string()
             } else {
                 format!("Value: {}", text)
             };
-            self.ui.label(id!(input_status)).set_text(cx, &display);
+            self.ui.label(ids!(input_status)).set_text(cx, &display);
             log!("Input changed: {}", text);
         }
 
         // Handle badge buttons
-        if self.ui.mp_button(id!(badge_inc_btn)).clicked(&actions) {
-            let current = self.ui.mp_badge(id!(interactive_badge)).count();
+        if self.ui.mp_button(ids!(badge_inc_btn)).clicked(&actions) {
+            let current = self.ui.mp_badge(ids!(interactive_badge)).count();
             let new_count = current + 1;
-            self.ui.mp_badge(id!(interactive_badge)).set_count(cx, new_count);
-            self.ui.label(id!(badge_count_label)).set_text(cx, &format!("Count: {}", new_count));
+            self.ui.mp_badge(ids!(interactive_badge)).set_count(cx, new_count);
+            self.ui.label(ids!(badge_count_label)).set_text(cx, &format!("Count: {}", new_count));
         }
-        if self.ui.mp_button(id!(badge_dec_btn)).clicked(&actions) {
-            let current = self.ui.mp_badge(id!(interactive_badge)).count();
+        if self.ui.mp_button(ids!(badge_dec_btn)).clicked(&actions) {
+            let current = self.ui.mp_badge(ids!(interactive_badge)).count();
             let new_count = (current - 1).max(0);
-            self.ui.mp_badge(id!(interactive_badge)).set_count(cx, new_count);
-            self.ui.label(id!(badge_count_label)).set_text(cx, &format!("Count: {}", new_count));
+            self.ui.mp_badge(ids!(interactive_badge)).set_count(cx, new_count);
+            self.ui.label(ids!(badge_count_label)).set_text(cx, &format!("Count: {}", new_count));
         }
     }
 }
@@ -1379,13 +1379,13 @@ impl App {
     fn update_checkbox_status(&mut self, cx: &mut Cx) {
         let mut selected = Vec::new();
 
-        if self.ui.mp_checkbox(id!(checkbox1)).is_checked() {
+        if self.ui.mp_checkbox(ids!(checkbox1)).is_checked() {
             selected.push("Option 1");
         }
-        if self.ui.mp_checkbox(id!(checkbox2)).is_checked() {
+        if self.ui.mp_checkbox(ids!(checkbox2)).is_checked() {
             selected.push("Option 2");
         }
-        if self.ui.mp_checkbox(id!(checkbox3)).is_checked() {
+        if self.ui.mp_checkbox(ids!(checkbox3)).is_checked() {
             selected.push("Option 3");
         }
 
@@ -1395,7 +1395,7 @@ impl App {
             format!("Selected: {}", selected.join(", "))
         };
 
-        self.ui.label(id!(checkbox_status)).set_text(cx, &status);
+        self.ui.label(ids!(checkbox_status)).set_text(cx, &status);
     }
 }
 

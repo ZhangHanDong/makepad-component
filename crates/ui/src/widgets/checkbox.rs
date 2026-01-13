@@ -140,20 +140,20 @@ impl Widget for MpCheckbox {
         match event.hits(cx, self.view.area()) {
             Hit::FingerHoverIn(_) => {
                 cx.set_cursor(MouseCursor::Hand);
-                self.animator_play(cx, id!(hover.on));
+                self.animator_play(cx, ids!(hover.on));
             }
             Hit::FingerHoverOut(_) => {
                 cx.set_cursor(MouseCursor::Default);
-                self.animator_play(cx, id!(hover.off));
+                self.animator_play(cx, ids!(hover.off));
             }
             Hit::FingerUp(fe) => {
                 if fe.is_over {
                     self.checked = !self.checked;
 
                     if self.checked {
-                        self.animator_play(cx, id!(checked.on));
+                        self.animator_play(cx, ids!(checked.on));
                     } else {
-                        self.animator_play(cx, id!(checked.off));
+                        self.animator_play(cx, ids!(checked.off));
                     }
 
                     cx.widget_action(uid, &scope.path, MpCheckboxAction::Changed(self.checked));
@@ -167,7 +167,7 @@ impl Widget for MpCheckbox {
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         // Update label text
         if !self.text.as_ref().is_empty() {
-            self.view.label(id!(label)).set_text(cx, self.text.as_ref());
+            self.view.label(ids!(label)).set_text(cx, self.text.as_ref());
         }
 
         self.view.draw_walk(cx, scope, walk)
@@ -182,9 +182,9 @@ impl MpCheckbox {
     pub fn set_checked(&mut self, cx: &mut Cx, checked: bool) {
         self.checked = checked;
         if checked {
-            self.animator_play(cx, id!(checked.on));
+            self.animator_play(cx, ids!(checked.on));
         } else {
-            self.animator_play(cx, id!(checked.off));
+            self.animator_play(cx, ids!(checked.off));
         }
         self.redraw(cx);
     }
