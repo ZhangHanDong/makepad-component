@@ -1,6 +1,6 @@
 # Makepad Component
 
-[![バージョン](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/aspect-ui/makepad-component)
+[![バージョン](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/ZhangHanDong/makepad-component)
 [![ライセンス](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green.svg)](LICENSE)
 
 **[English](README.md) | [中文](README_zh.md)**
@@ -66,7 +66,7 @@
 
 ```toml
 [dependencies]
-makepad-component = { git = "https://github.com/aspect-ui/makepad-component", branch = "main" }
+makepad-component = { git = "https://github.com/ZhangHanDong/makepad-component", branch = "main" }
 ```
 
 ## 使用方法
@@ -101,7 +101,7 @@ live_design! {
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/aspect-ui/makepad-component
+git clone https://github.com/ZhangHanDong/makepad-component
 cd makepad-component
 
 # コンポーネントズーデモを実行
