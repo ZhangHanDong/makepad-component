@@ -1,6 +1,6 @@
 # Makepad Component
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/aspect-ui/makepad-component)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/ZhangHanDong/makepad-component)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green.svg)](LICENSE)
 
 **[中文](README_zh.md) | [日本語](README_ja.md)**
@@ -71,7 +71,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-makepad-component = { git = "https://github.com/aspect-ui/makepad-component", branch = "main" }
+makepad-component = { git = "https://github.com/ZhangHanDong/makepad-component", branch = "main" }
 ```
 
 ## Usage
@@ -108,7 +108,7 @@ live_design! {
 
 ```bash
 # Clone the repository
-git clone https://github.com/aspect-ui/makepad-component
+git clone https://github.com/ZhangHanDong/makepad-component
 cd makepad-component
 
 # Run the component zoo demo
