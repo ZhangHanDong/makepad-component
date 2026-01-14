@@ -195,18 +195,18 @@ impl Widget for MpButton {
         match event.hits(cx, self.area) {
             Hit::FingerHoverIn(_) => {
                 cx.set_cursor(MouseCursor::Hand);
-                self.animator_play(cx, id!(hover.on));
+                self.animator_play(cx, ids!(hover.on));
             }
             Hit::FingerHoverOut(_) => {
                 cx.set_cursor(MouseCursor::Default);
-                self.animator_play(cx, id!(hover.off));
+                self.animator_play(cx, ids!(hover.off));
             }
             Hit::FingerDown(_) => {
-                self.animator_play(cx, id!(pressed.on));
+                self.animator_play(cx, ids!(pressed.on));
                 cx.widget_action(uid, &scope.path, MpButtonAction::Pressed);
             }
             Hit::FingerUp(fe) => {
-                self.animator_play(cx, id!(pressed.off));
+                self.animator_play(cx, ids!(pressed.off));
                 if fe.is_over {
                     cx.widget_action(uid, &scope.path, MpButtonAction::Clicked);
                 }

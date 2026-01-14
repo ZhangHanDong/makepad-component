@@ -358,11 +358,11 @@ impl Widget for MpSlider {
         match event.hits(cx, self.track_area) {
             Hit::FingerHoverIn(_) => {
                 cx.set_cursor(MouseCursor::Hand);
-                self.animator_play(cx, id!(hover.on));
+                self.animator_play(cx, ids!(hover.on));
             }
             Hit::FingerHoverOut(_) => {
                 if !self.dragging {
-                    self.animator_play(cx, id!(hover.off));
+                    self.animator_play(cx, ids!(hover.off));
                 }
             }
             Hit::FingerDown(fe) => {
@@ -375,7 +375,7 @@ impl Widget for MpSlider {
                     let mid = (start_progress + end_progress) / 2.0;
                     self.dragging_start_thumb = progress < mid;
                 }
-                self.animator_play(cx, id!(pressed.on));
+                self.animator_play(cx, ids!(pressed.on));
                 self.update_value_from_position(cx, fe.abs, scope);
             }
             Hit::FingerMove(fe) => {
@@ -386,8 +386,8 @@ impl Widget for MpSlider {
             Hit::FingerUp(_) => {
                 self.dragging = false;
                 self.dragging_start_thumb = false;
-                self.animator_play(cx, id!(pressed.off));
-                self.animator_play(cx, id!(hover.off));
+                self.animator_play(cx, ids!(pressed.off));
+                self.animator_play(cx, ids!(hover.off));
             }
             _ => {}
         }

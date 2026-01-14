@@ -339,13 +339,13 @@ impl Widget for MpTooltip {
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         // Hide popup - it will be drawn as overlay
-        self.view.view(id!(popup)).set_visible(cx, false);
+        self.view.view(ids!(popup)).set_visible(cx, false);
 
         // Draw the view (which contains user content)
         let result = self.view.draw_walk(cx, scope, walk);
 
         // Store rect for positioning
-        let content_area = self.view.view(id!(content)).area();
+        let content_area = self.view.view(ids!(content)).area();
         self.content_rect = content_area.rect(cx);
         self.anchor_rect = content_area.clipped_rect(cx);
 
@@ -361,13 +361,13 @@ impl Widget for MpTooltip {
 impl MpTooltip {
     fn draw_popup_overlay(&mut self, cx: &mut Cx2d, scope: &mut Scope) {
         // Update label text
-        self.view.label(id!(popup.popup_label)).set_text(cx, self.tip.as_ref());
+        self.view.label(ids!(popup.popup_label)).set_text(cx, self.tip.as_ref());
 
         // Begin overlay rendering
         self.draw_list.begin_overlay_reuse(cx);
 
         let pass_size = cx.current_pass_size();
-        cx.begin_sized_turtle(pass_size, Layout::flow_overlay());
+        cx.begin_root_turtle_for_pass(Layout::flow_overlay());
 
         // Calculate popup position with edge detection
         let anchor = if self.anchor_rect.size.x > 0.0 {
@@ -387,7 +387,7 @@ impl MpTooltip {
         };
 
         // Position and show popup
-        let popup = self.view.view(id!(popup));
+        let popup = self.view.view(ids!(popup));
         popup.set_visible(cx, true);
 
         // Use actual_position (may be flipped due to edge detection)

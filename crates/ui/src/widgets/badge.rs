@@ -239,7 +239,7 @@ impl Widget for MpBadge {
 impl MpBadge {
     /// Apply badge_offset to indicator margin
     fn apply_badge_offset(&mut self, cx: &mut Cx) {
-        let indicator = self.view.view(id!(badge_wrapper.indicator));
+        let indicator = self.view.view(ids!(badge_wrapper.indicator));
         indicator.apply_over(cx, live! {
             margin: { top: (self.badge_offset.y), right: (-self.badge_offset.x) }
         });
@@ -257,7 +257,7 @@ impl MpBadge {
         };
 
         // Update badge wrapper visibility
-        self.view.view(id!(badge_wrapper)).set_visible(cx, visible);
+        self.view.view(ids!(badge_wrapper)).set_visible(cx, visible);
 
         // Update badge text (for non-dot mode)
         if !self.dot_mode && visible {
@@ -266,7 +266,7 @@ impl MpBadge {
             } else {
                 self.count.to_string()
             };
-            self.view.label(id!(badge_wrapper.indicator.label)).set_text(cx, &text);
+            self.view.label(ids!(badge_wrapper.indicator.label)).set_text(cx, &text);
         }
     }
 

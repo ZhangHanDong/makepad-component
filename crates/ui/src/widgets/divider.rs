@@ -92,7 +92,7 @@ impl Widget for MpDividerWithLabel {
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         if !self.text.as_ref().is_empty() {
-            self.view.label(id!(label)).set_text(cx, self.text.as_ref());
+            self.view.label(ids!(label)).set_text(cx, self.text.as_ref());
         }
         self.view.draw_walk(cx, scope, walk)
     }

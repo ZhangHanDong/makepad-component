@@ -465,11 +465,11 @@ impl Widget for MpInputPassword {
 impl WidgetMatchEvent for MpInputPassword {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions, _scope: &mut Scope) {
         // Handle eye icon button click
-        if self.view.button(id!(eye_icon)).clicked(actions) {
+        if self.view.button(ids!(eye_icon)).clicked(actions) {
             self.password_visible = !self.password_visible;
 
             // Toggle password visibility on the input
-            let input = self.view.text_input(id!(input));
+            let input = self.view.text_input(ids!(input));
             input.set_is_password(cx, !self.password_visible);
 
             self.view.redraw(cx);
@@ -481,7 +481,7 @@ impl MpInputPasswordRef {
     /// Get the current password text
     pub fn text(&self) -> String {
         if let Some(inner) = self.borrow() {
-            inner.view.text_input(id!(input)).text()
+            inner.view.text_input(ids!(input)).text()
         } else {
             String::new()
         }
@@ -490,7 +490,7 @@ impl MpInputPasswordRef {
     /// Set the password text
     pub fn set_text(&self, cx: &mut Cx, text: &str) {
         if let Some(inner) = self.borrow() {
-            inner.view.text_input(id!(input)).set_text(cx, text);
+            inner.view.text_input(ids!(input)).set_text(cx, text);
         }
     }
 }
