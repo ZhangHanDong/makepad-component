@@ -35,6 +35,8 @@ live_design! {
     use makepad_component::widgets::notification::*;
     use makepad_component::widgets::modal::*;
     use makepad_component::widgets::popover::*;
+    use makepad_component::widgets::label::*;
+    use makepad_component::widgets::text::*;
 
     // ============================================================
     // Section Header Component
@@ -710,6 +712,276 @@ live_design! {
 
                             show_bg: true
                             draw_bg: { color: #bbf7d0 }
+
+                            // ===== Label Section =====
+                            <View> {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 16,
+
+                                <SectionHeader> { text: "Label" }
+
+                                // Size variants
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Size Variants" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 16,
+                                        align: { y: 1.0 }
+
+                                        <MpLabelXs> { text: "Extra Small" }
+                                        <MpLabelSm> { text: "Small" }
+                                        <MpLabel> { text: "Medium (default)" }
+                                        <MpLabelLg> { text: "Large" }
+                                        <MpLabelXl> { text: "Extra Large" }
+                                    }
+                                }
+
+                                // Color variants
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Color Variants" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 16,
+
+                                        <MpLabel> { text: "Default" }
+                                        <MpLabelMuted> { text: "Muted" }
+                                        <MpLabelPrimary> { text: "Primary" }
+                                        <MpLabelSuccess> { text: "Success" }
+                                        <MpLabelWarning> { text: "Warning" }
+                                        <MpLabelDanger> { text: "Danger" }
+                                        <MpLabelInfo> { text: "Info" }
+                                    }
+                                }
+
+                                // Headings
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Headings" }
+
+                                    <View> {
+                                        width: Fill, height: Fit,
+                                        flow: Down,
+                                        spacing: 8,
+
+                                        <MpHeading1> { text: "Heading 1" }
+                                        <MpHeading2> { text: "Heading 2" }
+                                        <MpHeading3> { text: "Heading 3" }
+                                        <MpHeading4> { text: "Heading 4" }
+                                        <MpHeading5> { text: "Heading 5" }
+                                        <MpHeading6> { text: "Heading 6" }
+                                    }
+                                }
+
+                                // Secondary text
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "With Secondary Text" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Down,
+                                        spacing: 8,
+
+                                        <MpLabel> {
+                                            text: "Username"
+                                            secondary: "(required)"
+                                        }
+                                        <MpLabel> {
+                                            text: "Email"
+                                            secondary: "optional"
+                                        }
+                                    }
+                                }
+
+                                // Masked text
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Masked Text (Password)" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 16,
+
+                                        <MpLabel> {
+                                            text: "password123"
+                                            masked: true
+                                        }
+                                        <MpLabel> {
+                                            text: "secret"
+                                            masked: true
+                                        }
+                                    }
+                                }
+
+                                // Highlighted text
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Text Highlighting (Search)" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Down,
+                                        spacing: 8,
+
+                                        <MpLabel> {
+                                            text: "The quick brown fox jumps over the lazy dog"
+                                            highlight: "fox"
+                                        }
+                                        <MpLabel> {
+                                            text: "Hello World, Hello Universe"
+                                            highlight: "hello"
+                                        }
+                                    }
+                                }
+                            }
+
+                            <MpDivider> {}
+
+                            // ===== Text Section =====
+                            <View> {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 16,
+
+                                <SectionHeader> { text: "Text" }
+
+                                // Paragraph text
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Paragraph Text (Word Wrap)" }
+
+                                    <View> {
+                                        width: 400, height: Fit,
+                                        padding: 16,
+                                        show_bg: true,
+                                        draw_bg: { color: #ffffff }
+
+                                        <MpText> {
+                                            text: "This is a paragraph of text that demonstrates word wrapping. When the text is too long to fit on a single line, it automatically wraps to the next line. This is useful for displaying longer content like descriptions or articles."
+                                        }
+                                    }
+                                }
+
+                                // Size variants
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Size Variants" }
+
+                                    <View> {
+                                        width: 400, height: Fit,
+                                        flow: Down,
+                                        spacing: 12,
+                                        padding: 16,
+                                        show_bg: true,
+                                        draw_bg: { color: #ffffff }
+
+                                        <MpTextXs> { text: "Extra small text for fine print" }
+                                        <MpTextSm> { text: "Small text for captions" }
+                                        <MpText> { text: "Medium text (default body)" }
+                                        <MpTextLg> { text: "Large text for emphasis" }
+                                        <MpTextXl> { text: "Extra large text for intro" }
+                                    }
+                                }
+
+                                // Color variants
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Color Variants" }
+
+                                    <View> {
+                                        width: 400, height: Fit,
+                                        flow: Down,
+                                        spacing: 8,
+                                        padding: 16,
+                                        show_bg: true,
+                                        draw_bg: { color: #ffffff }
+
+                                        <MpText> { text: "Default text color" }
+                                        <MpTextMuted> { text: "Muted text for secondary info" }
+                                        <MpTextPrimary> { text: "Primary colored text" }
+                                        <MpTextSuccess> { text: "Success message text" }
+                                        <MpTextWarning> { text: "Warning message text" }
+                                        <MpTextDanger> { text: "Danger/error message text" }
+                                    }
+                                }
+
+                                // Special variants
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Special Variants" }
+
+                                    <View> {
+                                        width: 500, height: Fit,
+                                        flow: Down,
+                                        spacing: 16,
+                                        padding: 16,
+                                        show_bg: true,
+                                        draw_bg: { color: #ffffff }
+
+                                        // Lead text
+                                        <MpTextLead> {
+                                            text: "This is lead text, perfect for introductory paragraphs that need to stand out."
+                                        }
+
+                                        // Inline code
+                                        <View> {
+                                            width: Fit, height: Fit,
+                                            flow: Right,
+                                            spacing: 4,
+                                            align: { y: 0.5 }
+
+                                            <MpTextInline> { text: "Use the " }
+                                            <MpTextCode> { text: "println!()" }
+                                            <MpTextInline> { text: " macro to print output." }
+                                        }
+
+                                        // Caption
+                                        <MpTextCaption> {
+                                            text: "Caption: This is a small caption text often used below images or figures."
+                                        }
+                                    }
+                                }
+                            }
+
+                            <MpDivider> {}
 
                             // ===== Badge Section =====
                             <View> {
