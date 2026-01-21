@@ -113,7 +113,7 @@ live_design! {
 
         show_bg: true,
         draw_bg: {
-            color: (MUTED)
+            instance color: (MUTED)
             instance radius: 4.0
 
             fn pixel(self) -> vec4 {
@@ -131,7 +131,7 @@ live_design! {
         }
 
         draw_text: {
-            text_style: <THEME_FONT_MONO> {
+            text_style: <THEME_FONT_CODE> {
                 font_size: 13.0
             }
             wrap: None,
