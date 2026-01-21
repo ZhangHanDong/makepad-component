@@ -2,6 +2,22 @@
 
 本项目参考 [gpui-component](../gpui-component) 的组件实现 Makepad 版本。
 
+## CRITICAL: Hook-Based Skill Loading
+
+**IMPORTANT:** When you see a message starting with `[makepad-skills]` in the conversation (from UserPromptSubmit hook), you MUST:
+
+1. **Read the routing instruction** - e.g., `[makepad-skills] Routing to: makepad-widgets makepad-layout`
+2. **Immediately call the Skill tool** for EACH skill listed before doing anything else
+3. **Do not skip this step** - the skills contain essential Makepad knowledge
+
+Example:
+```
+Hook output: [makepad-skills] Routing to: makepad-widgets makepad-layout
+Action: Call Skill(makepad-widgets), then Skill(makepad-layout)
+```
+
+The skills are located in `.claude/skills/` directory and contain Makepad-specific patterns, APIs, and best practices.
+
 ## 参考源
 
 - **gpui-component**: `/Users/zhangalex/Work/Projects/FW/robius/gpui-component/crates/ui/src/`
