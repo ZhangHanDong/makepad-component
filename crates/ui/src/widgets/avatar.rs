@@ -75,15 +75,36 @@ live_design! {
         }
     }
 
-    // Default avatar (medium size)
-    pub MpAvatar = <MpAvatarBase> {
+    // Default avatar (medium size) - with Widget support
+    pub MpAvatar = {{MpAvatar}} {
         width: (AVATAR_SIZE_MD)
         height: (AVATAR_SIZE_MD)
+        align: { x: 0.5, y: 0.5 }
+
+        show_bg: true
+        draw_bg: {
+            instance bg_color: (MUTED)
+
+            fn pixel(self) -> vec4 {
+                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                let c = self.rect_size * 0.5;
+                let r = min(c.x, c.y);
+
+                sdf.circle(c.x, c.y, r);
+                sdf.fill(self.bg_color);
+
+                return sdf.result;
+            }
+        }
 
         label = <Label> {
+            width: Fit
+            height: Fit
             draw_text: {
                 text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
+                color: (MUTED_FOREGROUND)
             }
+            text: ""
         }
     }
 
@@ -246,5 +267,56 @@ live_design! {
         flow: Right
         spacing: -12  // Negative spacing for overlap
         align: { y: 0.5 }
+    }
+}
+
+/// Avatar widget for displaying user profile pictures or initials
+#[derive(Live, LiveHook, Widget)]
+pub struct MpAvatar {
+    #[deref]
+    view: View,
+}
+
+impl Widget for MpAvatar {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        self.view.handle_event(cx, event, scope);
+    }
+
+    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        self.view.draw_walk(cx, scope, walk)
+    }
+}
+
+impl MpAvatar {
+    /// Set the avatar text (usually initials)
+    pub fn set_text(&mut self, cx: &mut Cx, text: &str) {
+        self.view.label(ids!(label)).set_text(cx, text);
+    }
+
+    /// Get initials from a full name (e.g., "John Doe" -> "JD")
+    pub fn set_initials_from_name(&mut self, cx: &mut Cx, name: &str) {
+        let initials: String = name
+            .split_whitespace()
+            .filter_map(|word| word.chars().next())
+            .take(2)
+            .collect::<String>()
+            .to_uppercase();
+        self.set_text(cx, &initials);
+    }
+}
+
+impl MpAvatarRef {
+    /// Set the avatar text (usually initials)
+    pub fn set_text(&self, cx: &mut Cx, text: &str) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_text(cx, text);
+        }
+    }
+
+    /// Set initials from a full name
+    pub fn set_initials_from_name(&self, cx: &mut Cx, name: &str) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_initials_from_name(cx, name);
+        }
     }
 }

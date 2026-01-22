@@ -2090,34 +2090,19 @@ live_design! {
                                         text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
                                         color: (MUTED_FOREGROUND)
                                     }
-                                    text: "Choose fixed or auto size, then open a placement:"
+                                    text: "Click a placement to open the drawer:"
                                 }
 
                                 <View> {
-                                    width: Fill, height: Fit,
+                                    width: Fit, height: Fit,
                                     flow: Right,
-                                    spacing: 24,
+                                    spacing: 12,
                                     align: { y: 0.5 }
 
-                                    <View> {
-                                        width: Fit, height: Fit,
-                                        flow: Down,
-                                        spacing: 8,
-
-                                        <SubsectionLabel> { text: "Fixed (scrollable)" }
-
-                                        <View> {
-                                            width: Fit, height: Fit,
-                                            flow: Right,
-                                            spacing: 12,
-                                            align: { y: 0.5 }
-
-                                            drawer_open_left_fixed = <MpButtonSecondary> { text: "Left" }
-                                            drawer_open_top_fixed = <MpButtonSecondary> { text: "Top" }
-                                            drawer_open_bottom_fixed = <MpButtonSecondary> { text: "Bottom" }
-                                            drawer_open_right_fixed = <MpButtonSecondary> { text: "Right" }
-                                        }
-                                    }
+                                    drawer_open_left = <MpButtonSecondary> { text: "Left" }
+                                    drawer_open_top = <MpButtonSecondary> { text: "Top" }
+                                    drawer_open_bottom = <MpButtonSecondary> { text: "Bottom" }
+                                    drawer_open_right = <MpButtonSecondary> { text: "Right" }
                                 }
                             }
 
@@ -2697,29 +2682,17 @@ impl MatchEvent for App {
         }
 
         // Handle drawer demo
-        if self.ui.mp_button(ids!(drawer_open_left_fixed)).clicked(&actions) {
-            self.open_drawer(cx, DrawerPlacement::Left, true);
+        if self.ui.mp_button(ids!(drawer_open_left)).clicked(&actions) {
+            self.show_drawer(cx, DrawerPlacement::Left);
         }
-        if self.ui.mp_button(ids!(drawer_open_right_fixed)).clicked(&actions) {
-            self.open_drawer(cx, DrawerPlacement::Right, true);
+        if self.ui.mp_button(ids!(drawer_open_right)).clicked(&actions) {
+            self.show_drawer(cx, DrawerPlacement::Right);
         }
-        if self.ui.mp_button(ids!(drawer_open_top_fixed)).clicked(&actions) {
-            self.open_drawer(cx, DrawerPlacement::Top, true);
+        if self.ui.mp_button(ids!(drawer_open_top)).clicked(&actions) {
+            self.show_drawer(cx, DrawerPlacement::Top);
         }
-        if self.ui.mp_button(ids!(drawer_open_bottom_fixed)).clicked(&actions) {
-            self.open_drawer(cx, DrawerPlacement::Bottom, true);
-        }
-        if self.ui.mp_button(ids!(drawer_open_left_auto)).clicked(&actions) {
-            self.open_drawer(cx, DrawerPlacement::Left, false);
-        }
-        if self.ui.mp_button(ids!(drawer_open_right_auto)).clicked(&actions) {
-            self.open_drawer(cx, DrawerPlacement::Right, false);
-        }
-        if self.ui.mp_button(ids!(drawer_open_top_auto)).clicked(&actions) {
-            self.open_drawer(cx, DrawerPlacement::Top, false);
-        }
-        if self.ui.mp_button(ids!(drawer_open_bottom_auto)).clicked(&actions) {
-            self.open_drawer(cx, DrawerPlacement::Bottom, false);
+        if self.ui.mp_button(ids!(drawer_open_bottom)).clicked(&actions) {
+            self.show_drawer(cx, DrawerPlacement::Bottom);
         }
         if self.ui.mp_button(ids!(drawer_close_left)).clicked(&actions) {
             self.hide_drawer(cx);
@@ -2765,6 +2738,16 @@ impl MatchEvent for App {
         {
             self.hide_drawer(cx);
         }
+        if self.ui.widget(ids!(drawer_overlay)).visible() {
+            if let Some(event) = self.ui.view(ids!(drawer_overlay)).finger_up(actions) {
+                if let Some(rect) = self.active_drawer_rect(cx) {
+                    if !rect.contains(event.abs) {
+                        self.hide_drawer(cx);
+                    }
+                }
+            }
+        }
+
         // Handle Tab clicks - Default style
         if self.ui.mp_tab(ids!(tab_home)).clicked(&actions) {
             self.select_tab(cx, "default", 0, "Home");
@@ -2903,26 +2886,6 @@ impl App {
         self.ui.redraw(cx);
     }
 
-    fn open_drawer(&mut self, cx: &mut Cx, placement: DrawerPlacement, fixed: bool) {
-        self.set_drawer_fixed(cx, fixed);
-        self.show_drawer(cx, placement);
-    }
-
-    fn set_drawer_fixed(&mut self, cx: &mut Cx, fixed: bool) {
-        self.ui
-            .widget(ids!(drawer_left.drawer))
-            .apply_over(cx, live! { fixed: (fixed) });
-        self.ui
-            .widget(ids!(drawer_right.drawer))
-            .apply_over(cx, live! { fixed: (fixed) });
-        self.ui
-            .widget(ids!(drawer_top.drawer))
-            .apply_over(cx, live! { fixed: (fixed) });
-        self.ui
-            .widget(ids!(drawer_bottom.drawer))
-            .apply_over(cx, live! { fixed: (fixed) });
-    }
-
     fn show_drawer(&mut self, cx: &mut Cx, placement: DrawerPlacement) {
         self.ui.widget(ids!(drawer_overlay)).set_visible(cx, true);
         self.ui
@@ -3002,20 +2965,7 @@ impl App {
 
 impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
-        let drawer_open = self.ui.widget(ids!(drawer_overlay)).visible();
         self.match_event(cx, event);
-        if drawer_open {
-            match event.hits(cx, self.ui.view(ids!(drawer_overlay)).area()) {
-                Hit::FingerUp(fe) if fe.was_tap() => {
-                    if let Some(rect) = self.active_drawer_rect(cx) {
-                        if !rect.contains(fe.abs) {
-                            self.hide_drawer(cx);
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
         self.ui.handle_event(cx, event, &mut Scope::empty());
     }
 }
