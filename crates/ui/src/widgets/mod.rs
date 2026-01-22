@@ -23,6 +23,7 @@ pub mod switch;
 pub mod tab;
 pub mod text;
 pub mod tooltip;
+pub mod drawer;
 
 pub use accordion::*;
 pub use alert::*;
@@ -77,4 +78,5 @@ pub fn live_design(cx: &mut Cx) {
     crate::widgets::tab::live_design(cx);
     crate::widgets::text::live_design(cx);
     crate::widgets::tooltip::live_design(cx);
+    crate::widgets::drawer::live_design(cx);
 }
