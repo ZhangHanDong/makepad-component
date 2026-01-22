@@ -15,12 +15,36 @@ live_design! {
             text_style: <THEME_FONT_REGULAR> { font_size: 14.0 }
             color: (PRIMARY)
 
+            instance hover: 0.0
+            instance pressed: 0.0
+
             fn get_color(self) -> vec4 {
                 return mix(
                     mix(self.color, self.color * 0.8, self.hover),
                     self.color * 0.6,
                     self.pressed
                 );
+            }
+        }
+
+        draw_underline: {
+            instance color: (PRIMARY)
+            instance hover: 0.0
+            instance pressed: 0.0
+
+            fn pixel(self) -> vec4 {
+                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                let y = self.rect_size.y - 1.0;
+                sdf.move_to(0.0, y);
+                sdf.line_to(self.rect_size.x, y);
+
+                let line_color = mix(
+                    mix(self.color, self.color * 0.8, self.hover),
+                    self.color * 0.6,
+                    self.pressed
+                );
+
+                return sdf.stroke(line_color, 1.0);
             }
         }
 
@@ -31,22 +55,34 @@ live_design! {
                 default: off
                 off = {
                     from: { all: Forward { duration: 0.15 } }
-                    apply: { draw_text: { hover: 0.0 } }
+                    apply: {
+                        draw_text: { hover: 0.0 }
+                        draw_underline: { hover: 0.0 }
+                    }
                 }
                 on = {
                     from: { all: Forward { duration: 0.15 } }
-                    apply: { draw_text: { hover: 1.0 } }
+                    apply: {
+                        draw_text: { hover: 1.0 }
+                        draw_underline: { hover: 1.0 }
+                    }
                 }
             }
             pressed = {
                 default: off
                 off = {
                     from: { all: Forward { duration: 0.1 } }
-                    apply: { draw_text: { pressed: 0.0 } }
+                    apply: {
+                        draw_text: { pressed: 0.0 }
+                        draw_underline: { pressed: 0.0 }
+                    }
                 }
                 on = {
                     from: { all: Forward { duration: 0.1 } }
-                    apply: { draw_text: { pressed: 1.0 } }
+                    apply: {
+                        draw_text: { pressed: 1.0 }
+                        draw_underline: { pressed: 1.0 }
+                    }
                 }
             }
         }
@@ -60,6 +96,9 @@ pub struct MpLink {
     #[redraw]
     #[live]
     draw_text: DrawText,
+
+    #[live]
+    draw_underline: DrawQuad,
 
     #[walk]
     walk: Walk,
@@ -116,11 +155,13 @@ impl Widget for MpLink {
             Hit::FingerUp(fe) => {
                 self.animator_play(cx, ids!(pressed.off));
                 if fe.is_over {
-                    let href = self.href.as_ref();
-                    if !href.is_empty() {
-                        cx.open_url(href, OpenUrlInPlace::No);
-                    }
-                    cx.widget_action(uid, &scope.path, MpLinkAction::Clicked);
+                    self.activate_link(cx, uid, scope);
+                }
+            }
+            Hit::KeyDown(ke) => {
+                if ke.key_code == KeyCode::ReturnKey || ke.key_code == KeyCode::Space {
+                    self.animator_play(cx, ids!(pressed.on));
+                    self.activate_link(cx, uid, scope);
                 }
             }
             _ => {}
@@ -128,14 +169,23 @@ impl Widget for MpLink {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
-        cx.begin_turtle(walk, self.layout);
+        self.draw_underline.begin(cx, walk, self.layout);
         self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
-        cx.end_turtle_with_area(&mut self.area);
+        self.draw_underline.end(cx);
+        self.area = self.draw_underline.area();
         DrawStep::done()
     }
 }
 
 impl MpLink {
+    fn activate_link(&mut self, cx: &mut Cx, uid: WidgetUid, scope: &Scope) {
+        let href = self.href.as_ref();
+        if !href.is_empty() {
+            cx.open_url(href, OpenUrlInPlace::No);
+        }
+        cx.widget_action(uid, &scope.path, MpLinkAction::Clicked);
+    }
+
     pub fn clicked(&self, actions: &Actions) -> bool {
         if let Some(action) = actions.find_widget_action(self.widget_uid()) {
             matches!(action.cast::<MpLinkAction>(), MpLinkAction::Clicked)
