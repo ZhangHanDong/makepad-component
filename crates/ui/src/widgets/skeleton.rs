@@ -199,4 +199,111 @@ live_design! {
             <MpSkeletonRounded> { width: 100, height: 12 }
         }
     }
+
+    // ============================================================
+    // Interactive Skeleton Widget
+    // ============================================================
+
+    pub MpSkeletonWidget = {{MpSkeletonWidget}} {
+        width: Fill
+        height: Fit
+        flow: Overlay
+
+        skeleton = <View> {
+            width: Fill
+            height: Fit
+            flow: Down
+            spacing: 8
+            visible: true
+
+            <MpSkeletonRounded> { width: Fill, height: 20 }
+        }
+
+        content = <View> {
+            width: Fill
+            height: Fit
+            visible: false
+        }
+    }
+}
+
+/// Skeleton widget actions
+#[derive(Clone, Debug, DefaultNone)]
+pub enum MpSkeletonAction {
+    None,
+    LoadingStarted,
+    LoadingFinished,
+}
+
+/// Interactive skeleton widget with loading state control
+#[derive(Live, LiveHook, Widget)]
+pub struct MpSkeletonWidget {
+    #[deref]
+    view: View,
+
+    #[live]
+    loading: bool,
+}
+
+impl Widget for MpSkeletonWidget {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        self.view.handle_event(cx, event, scope);
+    }
+
+    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        self.view.draw_walk(cx, scope, walk)
+    }
+}
+
+impl MpSkeletonWidget {
+    /// Set loading state - shows skeleton when true, content when false
+    pub fn set_loading(&mut self, cx: &mut Cx, loading: bool) {
+        self.loading = loading;
+        self.view.view(ids!(skeleton)).set_visible(cx, loading);
+        self.view.view(ids!(content)).set_visible(cx, !loading);
+        self.redraw(cx);
+    }
+
+    /// Check if currently loading
+    pub fn is_loading(&self) -> bool {
+        self.loading
+    }
+
+    /// Start loading (show skeleton)
+    pub fn start_loading(&mut self, cx: &mut Cx) {
+        self.set_loading(cx, true);
+    }
+
+    /// Finish loading (hide skeleton, show content)
+    pub fn finish_loading(&mut self, cx: &mut Cx) {
+        self.set_loading(cx, false);
+    }
+}
+
+impl MpSkeletonWidgetRef {
+    pub fn set_loading(&self, cx: &mut Cx, loading: bool) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_loading(cx, loading);
+        }
+    }
+
+    pub fn is_loading(&self) -> bool {
+        if let Some(inner) = self.borrow() {
+            inner.is_loading()
+        } else {
+            false
+        }
+    }
+
+    pub fn start_loading(&self, cx: &mut Cx) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.start_loading(cx);
+        }
+    }
+
+    pub fn finish_loading(&self, cx: &mut Cx) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.finish_loading(cx);
+        }
+    }
 }

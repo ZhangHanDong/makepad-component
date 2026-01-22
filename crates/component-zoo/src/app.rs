@@ -7,6 +7,13 @@ use makepad_component::widgets::MpProgressWidgetRefExt;
 use makepad_component::widgets::MpSliderWidgetRefExt;
 use makepad_component::widgets::MpBadgeWidgetRefExt;
 use makepad_component::widgets::MpTabWidgetRefExt;
+use makepad_component::widgets::MpCardAction;
+use makepad_component::widgets::MpAvatarWidgetRefExt;
+use makepad_component::widgets::MpModalAction;
+use makepad_component::widgets::MpModalWidgetWidgetRefExt;
+use makepad_component::widgets::MpNotificationWidgetWidgetRefExt;
+use makepad_component::widgets::MpSkeletonWidgetWidgetRefExt;
+use makepad_component::widgets::MpPopoverWidgetWidgetRefExt;
 
 live_design! {
     use link::theme::*;
@@ -30,6 +37,7 @@ live_design! {
     use makepad_component::widgets::card::*;
     use makepad_component::widgets::avatar::*;
     use makepad_component::widgets::skeleton::*;
+    use makepad_component::widgets::spinner::*;
     use makepad_component::widgets::accordion::*;
     use makepad_component::widgets::list::*;
     use makepad_component::widgets::notification::*;
@@ -38,6 +46,7 @@ live_design! {
     use makepad_component::widgets::label::*;
     use makepad_component::widgets::text::*;
     use makepad_component::widgets::link::*;
+    use makepad_component::widgets::alert::*;
 
     // ============================================================
     // Section Header Component
@@ -79,7 +88,13 @@ live_design! {
                 body = <View> {
                     width: Fill,
                     height: Fill,
-                    flow: Down,
+                    flow: Overlay,
+
+                    // Main content area
+                    main_content = <View> {
+                        width: Fill,
+                        height: Fill,
+                        flow: Down,
 
                     // Header area
                     <View> {
@@ -1281,6 +1296,32 @@ live_design! {
                                         <MpAvatarWarning> { label = { text: "GH" } }
                                     }
                                 }
+
+                                // Dynamic avatar
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Dynamic (click to change)" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 12,
+                                        align: { y: 0.5 }
+
+                                        dynamic_avatar = <MpAvatar> { label = { text: "??" } }
+                                        avatar_change_btn = <MpButtonSecondary> { text: "Random Name" }
+                                        avatar_name_label = <Label> {
+                                            draw_text: {
+                                                text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+                                                color: (MUTED_FOREGROUND)
+                                            }
+                                            text: "Click button..."
+                                        }
+                                    }
+                                }
                             }
 
                             <MpDivider> {}
@@ -1401,6 +1442,46 @@ live_design! {
                                         }
                                     }
                                 }
+
+                                // Clickable Card
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Clickable Card (hover to see effect)" }
+
+                                    <View> {
+                                        width: Fill, height: Fit,
+                                        flow: Right,
+                                        spacing: 12,
+
+                                        clickable_card_1 = <MpCardClickable> {
+                                            width: 200,
+                                            <MpCardHeader> {
+                                                <MpCardTitle> { text: "Click Me" }
+                                                <MpCardDescription> { text: "Hover and click" }
+                                            }
+                                        }
+
+                                        clickable_card_2 = <MpCardClickable> {
+                                            width: 200,
+                                            <MpCardHeader> {
+                                                <MpCardTitle> { text: "Interactive" }
+                                                <MpCardDescription> { text: "With hover effect" }
+                                            }
+                                        }
+
+                                        card_click_status = <Label> {
+                                            width: Fit, height: Fit,
+                                            draw_text: {
+                                                text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+                                                color: (MUTED_FOREGROUND)
+                                            }
+                                            text: "Click a card..."
+                                        }
+                                    }
+                                }
                             }
 
                             <MpDivider> {}
@@ -1439,6 +1520,69 @@ live_design! {
 
                                 <SectionHeader> { text: "Skeleton" }
 
+                                // Interactive Skeleton Demo
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 12,
+
+                                    <View> {
+                                        width: Fill, height: Fit,
+                                        flow: Right,
+                                        spacing: 8,
+                                        align: { y: 0.5 }
+
+                                        skeleton_toggle_btn = <MpButtonPrimary> { text: "Toggle Loading" }
+
+                                        skeleton_status = <Label> {
+                                            draw_text: {
+                                                text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+                                                color: (MUTED_FOREGROUND)
+                                            }
+                                            text: "Status: Loading"
+                                        }
+                                    }
+
+                                    // Interactive skeleton widget
+                                    interactive_skeleton = <MpSkeletonWidget> {
+                                        width: Fill,
+                                        height: Fit,
+
+                                        skeleton = <View> {
+                                            width: Fill, height: Fit,
+                                            flow: Down,
+                                            spacing: 8
+
+                                            <MpSkeletonRounded> { width: 150, height: 20 }
+                                            <MpSkeletonRounded> { width: Fill, height: 14 }
+                                            <MpSkeletonRounded> { width: 200, height: 14 }
+                                        }
+
+                                        content = <View> {
+                                            width: Fill, height: Fit,
+                                            flow: Down,
+                                            spacing: 8
+
+                                            <Label> {
+                                                draw_text: {
+                                                    text_style: <THEME_FONT_BOLD>{ font_size: 16.0 }
+                                                    color: (FOREGROUND)
+                                                }
+                                                text: "Content Loaded!"
+                                            }
+                                            <Label> {
+                                                draw_text: {
+                                                    text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+                                                    color: (MUTED_FOREGROUND)
+                                                }
+                                                text: "This is the actual content that appears after loading."
+                                            }
+                                        }
+                                    }
+                                }
+
+                                <MpDivider> { margin: { top: 8, bottom: 8 } }
+
                                 <View> {
                                     width: Fit, height: Fit,
                                     flow: Down,
@@ -1470,6 +1614,139 @@ live_design! {
                                     <SubsectionLabel> { text: "Card skeleton" }
 
                                     <MpSkeletonCard> {}
+                                }
+                            }
+
+                            <MpDivider> {}
+
+                            // ===== Spinner Section =====
+                            <View> {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 16,
+
+                                <SectionHeader> { text: "Spinner" }
+
+                                // Size variants
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Size variants" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 16,
+                                        align: { y: 0.5 }
+
+                                        <MpSpinnerXs> {}
+                                        <MpSpinnerSm> {}
+                                        <MpSpinnerMd> {}
+                                        <MpSpinnerLg> {}
+                                        <MpSpinnerXl> {}
+                                    }
+                                }
+
+                                // Color variants
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Color variants" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 16,
+                                        align: { y: 0.5 }
+
+                                        <MpSpinnerPrimary> {}
+                                        <MpSpinnerSuccess> {}
+                                        <MpSpinnerWarning> {}
+                                        <MpSpinnerDanger> {}
+                                    }
+                                }
+
+                                // Style variants
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Style variants" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 16,
+                                        align: { y: 0.5 }
+
+                                        <MpSpinnerThin> {}
+                                        <MpSpinner> {}
+                                        <MpSpinnerThick> {}
+                                        <MpSpinnerNoTrack> {}
+                                    }
+                                }
+
+                                // Speed variants
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Speed variants" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 16,
+                                        align: { y: 0.5 }
+
+                                        <MpSpinnerSlow> {}
+                                        <MpSpinner> {}
+                                        <MpSpinnerFast> {}
+                                    }
+                                }
+
+                                // Alternative styles
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Alternative styles" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 24,
+                                        align: { y: 0.5 }
+
+                                        <MpSpinnerDots> {}
+                                        <MpSpinnerPulse> {}
+                                    }
+                                }
+
+                                // With label
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "With label" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 32,
+                                        align: { y: 0.5 }
+
+                                        <MpSpinnerWithLabel> {}
+                                        <MpSpinnerWithLabelVertical> {}
+                                    }
                                 }
                             }
                         }
@@ -1978,6 +2255,169 @@ live_design! {
 
                             <MpDivider> {}
 
+                            // ===== Alert Section =====
+                            <View> {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 16,
+
+                                <SectionHeader> { text: "Alert" }
+
+                                // Alert Variants
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Variants" }
+
+                                    <View> {
+                                        width: Fill, height: Fit,
+                                        flow: Down,
+                                        spacing: 12,
+
+                                        <MpAlert> {
+                                            content = {
+                                                message = { text: "This is a default alert message." }
+                                            }
+                                        }
+
+                                        <MpAlertInfo> {
+                                            content = {
+                                                message = { text: "This is an info alert for general information." }
+                                            }
+                                        }
+
+                                        <MpAlertSuccess> {
+                                            content = {
+                                                message = { text: "Operation completed successfully!" }
+                                            }
+                                        }
+
+                                        <MpAlertWarning> {
+                                            content = {
+                                                message = { text: "Please review your input before continuing." }
+                                            }
+                                        }
+
+                                        <MpAlertError> {
+                                            content = {
+                                                message = { text: "Something went wrong. Please try again." }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Alert with Title
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "With Title" }
+
+                                    <View> {
+                                        width: Fill, height: Fit,
+                                        flow: Down,
+                                        spacing: 12,
+
+                                        <MpAlertInfo> {
+                                            content = {
+                                                title_wrapper = { visible: true, title = { text: "Information" } }
+                                                message = { text: "This alert has a title for more context." }
+                                            }
+                                        }
+
+                                        <MpAlertSuccess> {
+                                            content = {
+                                                title_wrapper = { visible: true, title = { text: "Success!" } }
+                                                message = { text: "Your changes have been saved successfully." }
+                                            }
+                                        }
+
+                                        <MpAlertError> {
+                                            content = {
+                                                title_wrapper = { visible: true, title = { text: "Error" } }
+                                                message = { text: "Failed to connect to the server. Check your network." }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Closable Alert
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Closable" }
+
+                                    <View> {
+                                        width: Fill, height: Fit,
+                                        flow: Down,
+                                        spacing: 12,
+
+                                        closable_alert = <MpAlertInfo> {
+                                            closable: true
+                                            content = {
+                                                message = { text: "This alert can be closed. Click the X button." }
+                                            }
+                                        }
+
+                                        closable_alert_warning = <MpAlertWarning> {
+                                            closable: true
+                                            content = {
+                                                title_wrapper = { visible: true, title = { text: "Warning" } }
+                                                message = { text: "This is a closable warning with title." }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Banner Alerts
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Banner Style" }
+
+                                    <View> {
+                                        width: Fill, height: Fit,
+                                        flow: Down,
+                                        spacing: 0,
+
+                                        <MpAlertBannerInfo> {
+                                            content = {
+                                                message = { text: "Info banner - full width, no border radius" }
+                                            }
+                                        }
+
+                                        <MpAlertBannerSuccess> {
+                                            closable: true
+                                            content = {
+                                                message = { text: "Success banner with close button" }
+                                            }
+                                        }
+
+                                        <MpAlertBannerWarning> {
+                                            content = {
+                                                message = { text: "Warning banner alert" }
+                                            }
+                                        }
+
+                                        <MpAlertBannerError> {
+                                            closable: true
+                                            content = {
+                                                message = { text: "Error banner - something needs attention!" }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            <MpDivider> {}
+
                             // ===== Notification Section =====
                             <View> {
                                 width: Fill, height: Fit,
@@ -1985,6 +2425,28 @@ live_design! {
                                 spacing: 16,
 
                                 <SectionHeader> { text: "Notification" }
+
+                                // Interactive Notification Demo
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Right,
+                                    spacing: 8,
+
+                                    show_success_notif = <MpButtonSuccess> { text: "Success" }
+                                    show_error_notif = <MpButtonDanger> { text: "Error" }
+                                    show_warning_notif = <MpButtonWarning> { text: "Warning" }
+                                    show_info_notif = <MpButtonPrimary> { text: "Info" }
+                                }
+
+                                <MpDivider> { margin: { top: 8, bottom: 8 } }
+
+                                <Label> {
+                                    draw_text: {
+                                        text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+                                        color: (MUTED_FOREGROUND)
+                                    }
+                                    text: "Notification previews (static):"
+                                }
 
                                 <View> {
                                     width: Fill, height: Fit,
@@ -2038,12 +2500,32 @@ live_design! {
 
                                 <SectionHeader> { text: "Modal" }
 
+                                // Interactive Modal Demo
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Right,
+                                    spacing: 16,
+                                    align: { y: 0.5 }
+
+                                    open_modal_btn = <MpButtonPrimary> { text: "Open Modal" }
+
+                                    modal_status = <Label> {
+                                        draw_text: {
+                                            text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+                                            color: (MUTED_FOREGROUND)
+                                        }
+                                        text: "Click button to open modal"
+                                    }
+                                }
+
+                                <MpDivider> { margin: { top: 8, bottom: 8 } }
+
                                 <Label> {
                                     draw_text: {
                                         text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
                                         color: (MUTED_FOREGROUND)
                                     }
-                                    text: "Modal dialogs (preview only, not functional):"
+                                    text: "Modal previews (static):"
                                 }
 
                                 // Basic Modal preview
@@ -2099,12 +2581,59 @@ live_design! {
 
                                 <SectionHeader> { text: "Popover" }
 
+                                // Interactive Popover Demo
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 12,
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Overlay,
+
+                                        popover_trigger_btn = <MpButtonPrimary> { text: "Toggle Popover" }
+
+                                        <View> {
+                                            width: Fit, height: Fit,
+                                            margin: { top: 44 }
+
+                                            interactive_popover = <MpPopoverWidget> {
+                                                content = <MpPopoverBase> {
+                                                    width: 200, height: Fit,
+                                                    padding: 12,
+                                                    flow: Down,
+                                                    spacing: 8,
+
+                                                    <Label> {
+                                                        draw_text: {
+                                                            text_style: <THEME_FONT_BOLD>{ font_size: 14.0 }
+                                                            color: (FOREGROUND)
+                                                        }
+                                                        text: "Interactive Popover"
+                                                    }
+                                                    <Label> {
+                                                        width: Fill,
+                                                        draw_text: {
+                                                            text_style: <THEME_FONT_REGULAR>{ font_size: 13.0 }
+                                                            color: (MUTED_FOREGROUND)
+                                                            wrap: Word
+                                                        }
+                                                        text: "Click the button again to close."
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                <MpDivider> { margin: { top: 8, bottom: 8 } }
+
                                 <Label> {
                                     draw_text: {
                                         text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
                                         color: (MUTED_FOREGROUND)
                                     }
-                                    text: "Popover components (preview only):"
+                                    text: "Popover previews (static):"
                                 }
 
                                 <View> {
@@ -2405,7 +2934,51 @@ live_design! {
                             }
                         }
                     }
-                }
+                    } // close main_content
+
+                    // Modal overlay - must be after main_content to appear on top
+                    demo_modal = <MpModalWidget> {
+                    content = {
+                        dialog = <MpModal> {
+                            width: 400,
+                            header = {
+                                title = { text: "Interactive Modal" }
+                            }
+                            body = {
+                                <Label> {
+                                    width: Fill,
+                                    height: Fit,
+                                    draw_text: {
+                                        text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+                                        color: (MUTED_FOREGROUND)
+                                        wrap: Word
+                                    }
+                                    text: "This is an interactive modal dialog. Click the X button or the backdrop to close it."
+                                }
+                            }
+                            footer = {
+                                modal_cancel_btn = <MpButtonGhost> { text: "Cancel" }
+                                modal_confirm_btn = <MpButtonPrimary> { text: "Confirm" }
+                            }
+                        }
+                    }
+                } // close demo_modal
+
+                    // Notification overlay - positioned at top-right
+                    <View> {
+                        width: Fill,
+                        height: Fill,
+                        align: { x: 1.0, y: 0.0 }
+                        padding: { top: 20, right: 20 }
+
+                        demo_notification = <MpNotificationWidget> {
+                            content = {
+                                title = { text: "Notification" }
+                                message = { text: "This is an interactive notification!" }
+                            }
+                        }
+                    }
+                } // close body (Overlay)
             }
         }
     }
@@ -2439,6 +3012,9 @@ impl MatchEvent for App {
 
         // Set initial category tab as selected
         self.ui.mp_tab(ids!(cat_form)).set_selected(cx, true);
+
+        // Initialize skeleton in loading state
+        self.ui.mp_skeleton_widget(ids!(interactive_skeleton)).set_loading(cx, true);
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -2582,6 +3158,81 @@ impl MatchEvent for App {
             let new_count = (current - 1).max(0);
             self.ui.mp_badge(ids!(interactive_badge)).set_count(cx, new_count);
             self.ui.label(ids!(badge_count_label)).set_text(cx, &format!("Count: {}", new_count));
+        }
+
+        // Handle avatar change button
+        if self.ui.mp_button(ids!(avatar_change_btn)).clicked(&actions) {
+            let names = ["Alice Wang", "Bob Smith", "Carol Lee", "David Kim", "Emma Chen", "Frank Zhang"];
+            let idx = (cx.event_id() as usize) % names.len();
+            let name = names[idx];
+            self.ui.mp_avatar(ids!(dynamic_avatar)).set_initials_from_name(cx, name);
+            self.ui.label(ids!(avatar_name_label)).set_text(cx, name);
+        }
+
+        // Handle clickable card clicks using as_widget_action().cast() pattern
+        for action in actions {
+            if let MpCardAction::Clicked = action.as_widget_action().cast() {
+                self.ui.label(ids!(card_click_status)).set_text(cx, "Card clicked!");
+            }
+            // Handle modal close request (backdrop or X button)
+            if let MpModalAction::CloseRequested = action.as_widget_action().cast() {
+                self.ui.mp_modal_widget(ids!(demo_modal)).close(cx);
+                self.ui.label(ids!(modal_status)).set_text(cx, "Modal closed");
+            }
+        }
+
+        // Handle open modal button
+        if self.ui.mp_button(ids!(open_modal_btn)).clicked(&actions) {
+            self.ui.mp_modal_widget(ids!(demo_modal)).open(cx);
+            self.ui.label(ids!(modal_status)).set_text(cx, "Modal opened");
+        }
+
+        // Handle modal cancel button
+        if self.ui.mp_button(ids!(modal_cancel_btn)).clicked(&actions) {
+            self.ui.mp_modal_widget(ids!(demo_modal)).close(cx);
+            self.ui.label(ids!(modal_status)).set_text(cx, "Cancelled");
+        }
+
+        // Handle modal confirm button
+        if self.ui.mp_button(ids!(modal_confirm_btn)).clicked(&actions) {
+            self.ui.mp_modal_widget(ids!(demo_modal)).close(cx);
+            self.ui.label(ids!(modal_status)).set_text(cx, "Confirmed!");
+        }
+
+        // Handle popover toggle button
+        if self.ui.mp_button(ids!(popover_trigger_btn)).clicked(&actions) {
+            self.ui.mp_popover_widget(ids!(interactive_popover)).toggle(cx);
+        }
+
+        // Handle skeleton toggle button
+        if self.ui.mp_button(ids!(skeleton_toggle_btn)).clicked(&actions) {
+            let skeleton = self.ui.mp_skeleton_widget(ids!(interactive_skeleton));
+            let is_loading = skeleton.is_loading();
+            skeleton.set_loading(cx, !is_loading);
+            let status = if !is_loading { "Loading" } else { "Loaded" };
+            self.ui.label(ids!(skeleton_status)).set_text(cx, &format!("Status: {}", status));
+        }
+
+        // Handle notification buttons
+        if self.ui.mp_button(ids!(show_success_notif)).clicked(&actions) {
+            self.ui.mp_notification_widget(ids!(demo_notification)).show_message(
+                cx, "Success!", "Operation completed successfully!"
+            );
+        }
+        if self.ui.mp_button(ids!(show_error_notif)).clicked(&actions) {
+            self.ui.mp_notification_widget(ids!(demo_notification)).show_message(
+                cx, "Error", "Something went wrong. Please try again."
+            );
+        }
+        if self.ui.mp_button(ids!(show_warning_notif)).clicked(&actions) {
+            self.ui.mp_notification_widget(ids!(demo_notification)).show_message(
+                cx, "Warning", "Please review your input before continuing."
+            );
+        }
+        if self.ui.mp_button(ids!(show_info_notif)).clicked(&actions) {
+            self.ui.mp_notification_widget(ids!(demo_notification)).show_message(
+                cx, "Info", "Here's some helpful information for you."
+            );
         }
 
         // Handle dropdown changes
