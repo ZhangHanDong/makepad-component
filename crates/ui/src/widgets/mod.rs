@@ -18,6 +18,7 @@ pub mod accordion;
 pub mod list;
 pub mod notification;
 pub mod modal;
+pub mod drawer;
 pub mod popover;
 pub mod label;
 pub mod text;
@@ -62,6 +63,7 @@ pub fn live_design(cx: &mut Cx) {
     crate::widgets::list::live_design(cx);
     crate::widgets::notification::live_design(cx);
     crate::widgets::modal::live_design(cx);
+    crate::widgets::drawer::live_design(cx);
     crate::widgets::popover::live_design(cx);
     crate::widgets::label::live_design(cx);
     crate::widgets::text::live_design(cx);

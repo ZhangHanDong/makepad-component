@@ -34,6 +34,7 @@ live_design! {
     use makepad_component::widgets::list::*;
     use makepad_component::widgets::notification::*;
     use makepad_component::widgets::modal::*;
+    use makepad_component::widgets::drawer::*;
     use makepad_component::widgets::popover::*;
     use makepad_component::widgets::label::*;
     use makepad_component::widgets::text::*;
@@ -54,6 +55,49 @@ live_design! {
         draw_text: {
             text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
             color: (MUTED_FOREGROUND)
+        }
+    }
+
+    FieldLabel = <Label> {
+        width: Fill, height: Fit,
+        draw_text: {
+            text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+            color: (MUTED_FOREGROUND)
+        }
+    }
+
+    DrawerForm = <View> {
+        width: Fill, height: Fit,
+        flow: Down,
+        spacing: 12,
+
+        <SubsectionLabel> { text: "Form" }
+
+        <View> {
+            width: Fill, height: Fit,
+            flow: Down,
+            spacing: 6,
+
+            <FieldLabel> { text: "Name" }
+            <MpInput> { width: Fill, empty_text: "Jane Doe" }
+        }
+
+        <View> {
+            width: Fill, height: Fit,
+            flow: Down,
+            spacing: 6,
+
+            <FieldLabel> { text: "Email" }
+            <MpInput> { width: Fill, empty_text: "jane@example.com" }
+        }
+
+        <View> {
+            width: Fill, height: Fit,
+            flow: Down,
+            spacing: 6,
+
+            <FieldLabel> { text: "Budget" }
+            <MpInputNumeric> { width: Fill, empty_text: "1000" }
         }
     }
 
@@ -78,7 +122,12 @@ live_design! {
                 body = <View> {
                     width: Fill,
                     height: Fill,
-                    flow: Down,
+                    flow: Overlay,
+
+                    content = <View> {
+                        width: Fill,
+                        height: Fill,
+                        flow: Down,
 
                     // Header area
                     <View> {
@@ -2028,6 +2077,52 @@ live_design! {
 
                             <MpDivider> {}
 
+                            // ===== Drawer Section =====
+                            <View> {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 16,
+
+                                <SectionHeader> { text: "Drawer" }
+
+                                <Label> {
+                                    draw_text: {
+                                        text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+                                        color: (MUTED_FOREGROUND)
+                                    }
+                                    text: "Choose fixed or auto size, then open a placement:"
+                                }
+
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Right,
+                                    spacing: 24,
+                                    align: { y: 0.5 }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Down,
+                                        spacing: 8,
+
+                                        <SubsectionLabel> { text: "Fixed (scrollable)" }
+
+                                        <View> {
+                                            width: Fit, height: Fit,
+                                            flow: Right,
+                                            spacing: 12,
+                                            align: { y: 0.5 }
+
+                                            drawer_open_left_fixed = <MpButtonSecondary> { text: "Left" }
+                                            drawer_open_top_fixed = <MpButtonSecondary> { text: "Top" }
+                                            drawer_open_bottom_fixed = <MpButtonSecondary> { text: "Bottom" }
+                                            drawer_open_right_fixed = <MpButtonSecondary> { text: "Right" }
+                                        }
+                                    }
+                                }
+                            }
+
+                            <MpDivider> {}
+
                             // ===== Popover Section =====
                             <View> {
                                 width: Fill, height: Fit,
@@ -2342,6 +2437,70 @@ live_design! {
                             }
                         }
                     }
+                    }
+                    drawer_overlay = <View> {
+                        width: Fill,
+                        height: Fill,
+                        flow: Overlay,
+                        visible: false,
+                        cursor: Default,
+
+                        drawer_left = <MpDrawerContainerLeft> {
+                            visible: false,
+                            drawer = {
+                                header = { title = { text: "Left Drawer" } }
+                                body = {
+                                    <DrawerForm> {}
+                                }
+                                footer = {
+                                    drawer_close_left = <MpButtonGhost> { text: "Close" }
+                                    <MpButtonPrimary> { text: "Apply" }
+                                }
+                            }
+                        }
+
+                        drawer_right = <MpDrawerContainerRight> {
+                            visible: false,
+                            drawer = {
+                                header = { title = { text: "Right Drawer" } }
+                                body = {
+                                    <DrawerForm> {}
+                                }
+                                footer = {
+                                    drawer_close_right = <MpButtonGhost> { text: "Close" }
+                                    <MpButtonPrimary> { text: "Save" }
+                                }
+                            }
+                        }
+
+                        drawer_top = <MpDrawerContainerTop> {
+                            visible: false,
+                            drawer = {
+                                header = { title = { text: "Top Drawer" } }
+                                body = {
+                                    <DrawerForm> {}
+                                }
+                                footer = {
+                                    drawer_close_top = <MpButtonGhost> { text: "Close" }
+                                    <MpButtonPrimary> { text: "Done" }
+                                }
+                            }
+                        }
+
+                        drawer_bottom = <MpDrawerContainerBottom> {
+                            visible: false,
+                            drawer = {
+                                header = { title = { text: "Bottom Drawer" } }
+                                body = {
+                                    <DrawerForm> {}
+                                }
+                                footer = {
+                                    drawer_close_bottom = <MpButtonGhost> { text: "Close" }
+                                    <MpButtonPrimary> { text: "Confirm" }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -2349,6 +2508,14 @@ live_design! {
 }
 
 app_main!(App);
+
+#[derive(Clone, Copy)]
+enum DrawerPlacement {
+    Left,
+    Right,
+    Top,
+    Bottom,
+}
 
 #[derive(Live, LiveHook)]
 pub struct App {
@@ -2376,6 +2543,7 @@ impl MatchEvent for App {
 
         // Set initial category tab as selected
         self.ui.mp_tab(ids!(cat_form)).set_selected(cx, true);
+        self.hide_drawer(cx);
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -2528,6 +2696,75 @@ impl MatchEvent for App {
             self.ui.label(ids!(dropdown_status)).set_text(cx, &format!("Selected: {}", label));
         }
 
+        // Handle drawer demo
+        if self.ui.mp_button(ids!(drawer_open_left_fixed)).clicked(&actions) {
+            self.open_drawer(cx, DrawerPlacement::Left, true);
+        }
+        if self.ui.mp_button(ids!(drawer_open_right_fixed)).clicked(&actions) {
+            self.open_drawer(cx, DrawerPlacement::Right, true);
+        }
+        if self.ui.mp_button(ids!(drawer_open_top_fixed)).clicked(&actions) {
+            self.open_drawer(cx, DrawerPlacement::Top, true);
+        }
+        if self.ui.mp_button(ids!(drawer_open_bottom_fixed)).clicked(&actions) {
+            self.open_drawer(cx, DrawerPlacement::Bottom, true);
+        }
+        if self.ui.mp_button(ids!(drawer_open_left_auto)).clicked(&actions) {
+            self.open_drawer(cx, DrawerPlacement::Left, false);
+        }
+        if self.ui.mp_button(ids!(drawer_open_right_auto)).clicked(&actions) {
+            self.open_drawer(cx, DrawerPlacement::Right, false);
+        }
+        if self.ui.mp_button(ids!(drawer_open_top_auto)).clicked(&actions) {
+            self.open_drawer(cx, DrawerPlacement::Top, false);
+        }
+        if self.ui.mp_button(ids!(drawer_open_bottom_auto)).clicked(&actions) {
+            self.open_drawer(cx, DrawerPlacement::Bottom, false);
+        }
+        if self.ui.mp_button(ids!(drawer_close_left)).clicked(&actions) {
+            self.hide_drawer(cx);
+        }
+        if self.ui.mp_button(ids!(drawer_close_right)).clicked(&actions) {
+            self.hide_drawer(cx);
+        }
+        if self.ui.mp_button(ids!(drawer_close_top)).clicked(&actions) {
+            self.hide_drawer(cx);
+        }
+        if self.ui.mp_button(ids!(drawer_close_bottom)).clicked(&actions) {
+            self.hide_drawer(cx);
+        }
+        if self
+            .ui
+            .view(ids!(drawer_left.drawer.header.close))
+            .finger_up(actions)
+            .is_some()
+        {
+            self.hide_drawer(cx);
+        }
+        if self
+            .ui
+            .view(ids!(drawer_right.drawer.header.close))
+            .finger_up(actions)
+            .is_some()
+        {
+            self.hide_drawer(cx);
+        }
+        if self
+            .ui
+            .view(ids!(drawer_top.drawer.header.close))
+            .finger_up(actions)
+            .is_some()
+        {
+            self.hide_drawer(cx);
+        }
+        if self
+            .ui
+            .view(ids!(drawer_bottom.drawer.header.close))
+            .finger_up(actions)
+            .is_some()
+        {
+            self.hide_drawer(cx);
+        }
         // Handle Tab clicks - Default style
         if self.ui.mp_tab(ids!(tab_home)).clicked(&actions) {
             self.select_tab(cx, "default", 0, "Home");
@@ -2666,6 +2903,68 @@ impl App {
         self.ui.redraw(cx);
     }
 
+    fn open_drawer(&mut self, cx: &mut Cx, placement: DrawerPlacement, fixed: bool) {
+        self.set_drawer_fixed(cx, fixed);
+        self.show_drawer(cx, placement);
+    }
+
+    fn set_drawer_fixed(&mut self, cx: &mut Cx, fixed: bool) {
+        self.ui
+            .widget(ids!(drawer_left.drawer))
+            .apply_over(cx, live! { fixed: (fixed) });
+        self.ui
+            .widget(ids!(drawer_right.drawer))
+            .apply_over(cx, live! { fixed: (fixed) });
+        self.ui
+            .widget(ids!(drawer_top.drawer))
+            .apply_over(cx, live! { fixed: (fixed) });
+        self.ui
+            .widget(ids!(drawer_bottom.drawer))
+            .apply_over(cx, live! { fixed: (fixed) });
+    }
+
+    fn show_drawer(&mut self, cx: &mut Cx, placement: DrawerPlacement) {
+        self.ui.widget(ids!(drawer_overlay)).set_visible(cx, true);
+        self.ui
+            .widget(ids!(drawer_left))
+            .set_visible(cx, matches!(placement, DrawerPlacement::Left));
+        self.ui
+            .widget(ids!(drawer_right))
+            .set_visible(cx, matches!(placement, DrawerPlacement::Right));
+        self.ui
+            .widget(ids!(drawer_top))
+            .set_visible(cx, matches!(placement, DrawerPlacement::Top));
+        self.ui
+            .widget(ids!(drawer_bottom))
+            .set_visible(cx, matches!(placement, DrawerPlacement::Bottom));
+        self.ui.redraw(cx);
+    }
+
+    fn active_drawer_rect(&self, cx: &Cx) -> Option<Rect> {
+        if self.ui.widget(ids!(drawer_left)).visible() {
+            return Some(self.ui.widget(ids!(drawer_left.drawer)).area().rect(cx));
+        }
+        if self.ui.widget(ids!(drawer_right)).visible() {
+            return Some(self.ui.widget(ids!(drawer_right.drawer)).area().rect(cx));
+        }
+        if self.ui.widget(ids!(drawer_top)).visible() {
+            return Some(self.ui.widget(ids!(drawer_top.drawer)).area().rect(cx));
+        }
+        if self.ui.widget(ids!(drawer_bottom)).visible() {
+            return Some(self.ui.widget(ids!(drawer_bottom.drawer)).area().rect(cx));
+        }
+        None
+    }
+
+    fn hide_drawer(&mut self, cx: &mut Cx) {
+        self.ui.widget(ids!(drawer_overlay)).set_visible(cx, false);
+        self.ui.widget(ids!(drawer_left)).set_visible(cx, false);
+        self.ui.widget(ids!(drawer_right)).set_visible(cx, false);
+        self.ui.widget(ids!(drawer_top)).set_visible(cx, false);
+        self.ui.widget(ids!(drawer_bottom)).set_visible(cx, false);
+        self.ui.redraw(cx);
+    }
+
     fn select_tab(&mut self, cx: &mut Cx, style: &str, index: usize, label: &str) {
         match style {
             "default" => {
@@ -2703,7 +3002,20 @@ impl App {
 
 impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
+        let drawer_open = self.ui.widget(ids!(drawer_overlay)).visible();
         self.match_event(cx, event);
+        if drawer_open {
+            match event.hits(cx, self.ui.view(ids!(drawer_overlay)).area()) {
+                Hit::FingerUp(fe) if fe.was_tap() => {
+                    if let Some(rect) = self.active_drawer_rect(cx) {
+                        if !rect.contains(fe.abs) {
+                            self.hide_drawer(cx);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
         self.ui.handle_event(cx, event, &mut Scope::empty());
     }
 }
