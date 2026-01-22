@@ -1,3 +1,4 @@
+pub mod alert;
 pub mod button;
 pub mod checkbox;
 pub mod switch;
@@ -22,6 +23,7 @@ pub mod popover;
 pub mod label;
 pub mod text;
 
+pub use alert::*;
 pub use button::*;
 pub use checkbox::*;
 pub use switch::*;
@@ -42,6 +44,7 @@ pub use text::*;
 use makepad_widgets::Cx;
 
 pub fn live_design(cx: &mut Cx) {
+    crate::widgets::alert::live_design(cx);
     crate::widgets::button::live_design(cx);
     crate::widgets::checkbox::live_design(cx);
     crate::widgets::switch::live_design(cx);
