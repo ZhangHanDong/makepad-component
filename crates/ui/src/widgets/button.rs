@@ -117,6 +117,30 @@ live_design! {
         }
     }
 
+    // Variant: Success Button
+    pub MpButtonSuccess = <MpButton> {
+        draw_bg: {
+            color: (SUCCESS)
+            color_hover: (SUCCESS_HOVER)
+            color_pressed: (SUCCESS_HOVER)
+        }
+        draw_text: {
+            color: (SUCCESS_FOREGROUND)
+        }
+    }
+
+    // Variant: Warning Button
+    pub MpButtonWarning = <MpButton> {
+        draw_bg: {
+            color: (WARNING)
+            color_hover: (WARNING_HOVER)
+            color_pressed: (WARNING_HOVER)
+        }
+        draw_text: {
+            color: (WARNING_FOREGROUND)
+        }
+    }
+
     // Variant: Ghost Button
     pub MpButtonGhost = <MpButton> {
         draw_bg: {

@@ -347,4 +347,154 @@ live_design! {
             color: (BORDER)
         }
     }
+
+    // ============================================================
+    // Interactive Modal Widget
+    // ============================================================
+
+    pub MpModalWidget = {{MpModalWidget}} {
+        width: Fill
+        height: Fill
+        flow: Overlay
+        visible: false
+
+        backdrop = <View> {
+            width: Fill
+            height: Fill
+            show_bg: true
+            draw_bg: { color: #00000080 }
+        }
+
+        content = <View> {
+            width: Fill
+            height: Fill
+            align: { x: 0.5, y: 0.5 }
+
+            dialog = <MpModal> {}
+        }
+    }
+}
+
+/// Modal actions
+#[derive(Clone, Debug, DefaultNone)]
+pub enum MpModalAction {
+    None,
+    Opened,
+    Closed,
+    CloseRequested,
+}
+
+/// Interactive modal widget with open/close functionality
+#[derive(Live, LiveHook, Widget)]
+pub struct MpModalWidget {
+    #[deref]
+    view: View,
+
+    #[live]
+    visible: bool,
+}
+
+impl Widget for MpModalWidget {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        if !self.visible {
+            return;
+        }
+
+        self.view.handle_event(cx, event, scope);
+
+        // Handle backdrop click to close
+        let backdrop = self.view.view(ids!(backdrop));
+        if let Hit::FingerUp(fe) = event.hits(cx, backdrop.area()) {
+            if fe.is_over {
+                cx.widget_action(self.widget_uid(), &scope.path, MpModalAction::CloseRequested);
+            }
+        }
+
+        // Handle close button click
+        let close_btn = self.view.view(ids!(content.dialog.header.close));
+        match event.hits(cx, close_btn.area()) {
+            Hit::FingerHoverIn(_) => {
+                close_btn.apply_over(cx, live!{ draw_bg: { hover: 1.0 } });
+                close_btn.redraw(cx);
+            }
+            Hit::FingerHoverOut(_) => {
+                close_btn.apply_over(cx, live!{ draw_bg: { hover: 0.0 } });
+                close_btn.redraw(cx);
+            }
+            Hit::FingerUp(fe) => {
+                if fe.is_over {
+                    cx.widget_action(self.widget_uid(), &scope.path, MpModalAction::CloseRequested);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        if !self.visible {
+            return DrawStep::done();
+        }
+        self.view.draw_walk(cx, scope, walk)
+    }
+}
+
+impl MpModalWidget {
+    /// Open the modal
+    pub fn open(&mut self, cx: &mut Cx) {
+        self.visible = true;
+        self.redraw(cx);
+    }
+
+    /// Close the modal
+    pub fn close(&mut self, cx: &mut Cx) {
+        self.visible = false;
+        self.redraw(cx);
+    }
+
+    /// Check if modal is visible
+    pub fn is_open(&self) -> bool {
+        self.visible
+    }
+
+    /// Set the modal title
+    pub fn set_title(&mut self, cx: &mut Cx, title: &str) {
+        self.view.label(ids!(content.dialog.header.title)).set_text(cx, title);
+    }
+}
+
+impl MpModalWidgetRef {
+    pub fn open(&self, cx: &mut Cx) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.open(cx);
+        }
+    }
+
+    pub fn close(&self, cx: &mut Cx) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.close(cx);
+        }
+    }
+
+    pub fn is_open(&self) -> bool {
+        if let Some(inner) = self.borrow() {
+            inner.is_open()
+        } else {
+            false
+        }
+    }
+
+    pub fn set_title(&self, cx: &mut Cx, title: &str) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(cx, title);
+        }
+    }
+
+    pub fn close_requested(&self, actions: &Actions) -> bool {
+        if let Some(inner) = self.borrow() {
+            if let Some(item) = actions.find_widget_action(inner.widget_uid()) {
+                return matches!(item.cast::<MpModalAction>(), MpModalAction::CloseRequested);
+            }
+        }
+        false
+    }
 }

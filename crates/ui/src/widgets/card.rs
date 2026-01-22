@@ -301,4 +301,112 @@ live_design! {
             border_color: #a5f3fc
         }
     }
+
+    // ============================================================
+    // Interactive Card (with click support)
+    // ============================================================
+
+    pub MpCardClickable = {{MpCardClickable}} {
+        width: Fill
+        height: Fit
+        flow: Down
+        padding: 16
+        spacing: 12
+        cursor: Hand
+
+        show_bg: true
+        draw_bg: {
+            instance bg_color: (CARD)
+            instance bg_color_hover: #f8fafc
+            instance border_radius: 8.0
+            instance border_color: (BORDER)
+            instance hover: 0.0
+
+            fn pixel(self) -> vec4 {
+                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+
+                let bg = mix(self.bg_color, self.bg_color_hover, self.hover);
+
+                sdf.box(
+                    0.5,
+                    0.5,
+                    self.rect_size.x - 1.0,
+                    self.rect_size.y - 1.0,
+                    self.border_radius
+                );
+                sdf.fill_keep(bg);
+                sdf.stroke(self.border_color, 1.0);
+
+                return sdf.result;
+            }
+        }
+    }
+}
+
+/// Card action emitted when clicked
+#[derive(Clone, Debug, DefaultNone)]
+pub enum MpCardAction {
+    None,
+    Clicked,
+}
+
+/// Interactive card widget with hover effect and click support
+#[derive(Live, LiveHook, Widget)]
+pub struct MpCardClickable {
+    #[deref]
+    view: View,
+
+    #[rust]
+    hover: f32,
+}
+
+impl Widget for MpCardClickable {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        self.view.handle_event(cx, event, scope);
+
+        match event.hits(cx, self.view.area()) {
+            Hit::FingerHoverIn(_) => {
+                self.hover = 1.0;
+                self.view.apply_over(cx, live!{ draw_bg: { hover: 1.0 } });
+                self.redraw(cx);
+            }
+            Hit::FingerHoverOut(_) => {
+                self.hover = 0.0;
+                self.view.apply_over(cx, live!{ draw_bg: { hover: 0.0 } });
+                self.redraw(cx);
+            }
+            Hit::FingerUp(fe) => {
+                if fe.is_over {
+                    cx.widget_action(self.widget_uid(), &scope.path, MpCardAction::Clicked);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        self.view.draw_walk(cx, scope, walk)
+    }
+}
+
+impl MpCardClickable {
+    /// Check if the card was clicked
+    pub fn clicked(&self, actions: &Actions) -> bool {
+        if let Some(item) = actions.find_widget_action(self.widget_uid()) {
+            matches!(item.cast::<MpCardAction>(), MpCardAction::Clicked)
+        } else {
+            false
+        }
+    }
+}
+
+impl MpCardClickableRef {
+    /// Check if the card was clicked
+    pub fn clicked(&self, actions: &Actions) -> bool {
+        if let Some(inner) = self.borrow() {
+            inner.clicked(actions)
+        } else {
+            false
+        }
+    }
 }
