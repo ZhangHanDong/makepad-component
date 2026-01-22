@@ -37,6 +37,7 @@ live_design! {
     use makepad_component::widgets::popover::*;
     use makepad_component::widgets::label::*;
     use makepad_component::widgets::text::*;
+    use makepad_component::widgets::link::*;
 
     // ============================================================
     // Section Header Component
@@ -977,6 +978,68 @@ live_design! {
                                         <MpTextCaption> {
                                             text: "Caption: This is a small caption text often used below images or figures."
                                         }
+                                    }
+                                }
+                            }
+
+                            <MpDivider> {}
+
+                            // ===== Link Section =====
+                            <View> {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 16,
+
+                                <SectionHeader> { text: "Link" }
+
+                                // Basic links
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Basic Links" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 16,
+
+                                        <MpLink> {
+                                            text: "Visit Makepad"
+                                            href: "https://makepad.nl"
+                                        }
+                                        <MpLink> {
+                                            text: "GitHub Repository"
+                                            href: "https://github.com/makepad/makepad"
+                                        }
+                                        <MpLink> {
+                                            text: "Documentation"
+                                            href: "https://makepad.dev"
+                                        }
+                                    }
+                                }
+
+                                // Inline with text
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Inline with Text" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 4,
+                                        align: { y: 0.5 }
+
+                                        <MpLabel> { text: "Check out" }
+                                        <MpLink> {
+                                            text: "our website"
+                                            href: "https://makepad.nl"
+                                        }
+                                        <MpLabel> { text: "for more information." }
                                     }
                                 }
                             }

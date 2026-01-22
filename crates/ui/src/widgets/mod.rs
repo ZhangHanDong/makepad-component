@@ -21,6 +21,7 @@ pub mod modal;
 pub mod popover;
 pub mod label;
 pub mod text;
+pub mod link;
 
 pub use button::*;
 pub use checkbox::*;
@@ -37,6 +38,7 @@ pub use tab::*;
 pub use accordion::*;
 pub use label::*;
 pub use text::*;
+pub use link::*;
 // dropdown, card, avatar, skeleton 只定义 live_design 样式，不导出 Rust 类型
 
 use makepad_widgets::Cx;
@@ -65,4 +67,5 @@ pub fn live_design(cx: &mut Cx) {
     crate::widgets::popover::live_design(cx);
     crate::widgets::label::live_design(cx);
     crate::widgets::text::live_design(cx);
+    crate::widgets::link::live_design(cx);
 }

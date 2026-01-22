@@ -51,6 +51,7 @@ The skills are located in `.claude/skills/` directory and contain Makepad-specif
 | Text | text/ | widgets/text.rs |
 | Tooltip | tooltip.rs | widgets/tooltip.rs |
 | Label | label.rs | widgets/label.rs |
+| Link | link.rs | widgets/link.rs |
 
 ### 待实现组件 📋
 
@@ -69,7 +70,6 @@ The skills are located in `.claude/skills/` directory and contain Makepad-specif
 | Highlighter | highlighter/ | 低 | 代码高亮 |
 | Icon | icon.rs | 高 | 图标组件 |
 | Kbd | kbd.rs | 低 | 键盘快捷键显示 |
-| Link | link.rs | 中 | 链接组件 |
 | Menu | menu/ | 高 | 菜单组件 |
 | Pagination | pagination.rs | 中 | 分页组件 |
 | Plot | plot/ | 低 | 绑图组件 |
