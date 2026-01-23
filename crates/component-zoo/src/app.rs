@@ -40,6 +40,7 @@ live_design! {
     use makepad_component::widgets::spinner::*;
     use makepad_component::widgets::accordion::*;
     use makepad_component::widgets::list::*;
+    use makepad_component::widgets::space::*;
     use makepad_component::widgets::notification::*;
     use makepad_component::widgets::modal::*;
     use makepad_component::widgets::popover::*;
@@ -63,6 +64,28 @@ live_design! {
         draw_text: {
             text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
             color: (MUTED_FOREGROUND)
+        }
+    }
+
+    SpaceChip = <View> {
+        width: Fit, height: Fit,
+        padding: { left: 10, right: 10, top: 6, bottom: 6 }
+        margin: { bottom: 8 }
+        align: { x: 0.5, y: 0.5 }
+
+        show_bg: true
+        draw_bg: {
+            color: (SECONDARY)
+            border_radius: 6.0
+            border_color: (BORDER)
+        }
+
+        label = <Label> {
+            draw_text: {
+                text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                color: (SECONDARY_FOREGROUND)
+            }
+            text: "Chip"
         }
     }
 
@@ -1417,6 +1440,134 @@ live_design! {
                                             }
                                             text: "Click a card..."
                                         }
+                                    }
+                                }
+                            }
+
+                            <MpDivider> {}
+
+                            // ===== Space Section =====
+                            <View> {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 16,
+
+                                <SectionHeader> { text: "Space" }
+
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Basic" }
+
+                                    <MpSpace> {
+                                        <MpButtonSecondary> { text: "One" }
+                                        <MpButtonSecondary> { text: "Two" }
+                                        <MpButtonSecondary> { text: "Three" }
+                                        <MpButtonSecondary> { text: "Four" }
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Sizes" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Down,
+                                        spacing: 8,
+
+                                        <MpSpaceMini> {
+                                            <MpButtonGhost> { text: "Mini" }
+                                            <MpButtonGhost> { text: "Item" }
+                                            <MpButtonGhost> { text: "Item" }
+                                        }
+
+                                        <MpSpaceSmall> {
+                                            <MpButtonGhost> { text: "Small" }
+                                            <MpButtonGhost> { text: "Item" }
+                                            <MpButtonGhost> { text: "Item" }
+                                        }
+
+                                        <MpSpaceMedium> {
+                                            <MpButtonGhost> { text: "Medium" }
+                                            <MpButtonGhost> { text: "Item" }
+                                            <MpButtonGhost> { text: "Item" }
+                                        }
+
+                                        <MpSpaceLarge> {
+                                            <MpButtonGhost> { text: "Large" }
+                                            <MpButtonGhost> { text: "Item" }
+                                            <MpButtonGhost> { text: "Item" }
+                                        }
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Direction" }
+
+                                    <View> {
+                                        width: Fit, height: Fit,
+                                        flow: Right,
+                                        spacing: 24,
+
+                                        <MpSpaceVertical> {
+                                            <MpButtonSecondary> { text: "Top" }
+                                            <MpButtonSecondary> { text: "Middle" }
+                                            <MpButtonSecondary> { text: "Bottom" }
+                                        }
+
+                                        <MpSpace> {
+                                            <MpButtonSecondary> { text: "Left" }
+                                            <MpButtonSecondary> { text: "Center" }
+                                            <MpButtonSecondary> { text: "Right" }
+                                        }
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Wrap" }
+
+                                    <MpSpaceWrap> {
+                                        width: 320,
+                                        height: Fit,
+
+                                        <SpaceChip> { label = { text: "Alpha" } }
+                                        <SpaceChip> { label = { text: "Beta" } }
+                                        <SpaceChip> { label = { text: "Gamma" } }
+                                        <SpaceChip> { label = { text: "Delta" } }
+                                        <SpaceChip> { label = { text: "Epsilon" } }
+                                        <SpaceChip> { label = { text: "Zeta" } }
+                                        <SpaceChip> { label = { text: "Eta" } }
+                                        <SpaceChip> { label = { text: "Theta" } }
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Split (manual)" }
+
+                                    <MpSpace> {
+                                        <MpButtonGhost> { text: "Edit" }
+                                        <MpSpaceSplit> {}
+                                        <MpButtonGhost> { text: "Share" }
+                                        <MpSpaceSplit> {}
+                                        <MpButtonGhost> { text: "Download" }
                                     }
                                 }
                             }
