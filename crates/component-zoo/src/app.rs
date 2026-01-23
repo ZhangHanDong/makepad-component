@@ -7,6 +7,7 @@ use makepad_component::widgets::MpProgressWidgetRefExt;
 use makepad_component::widgets::MpSliderWidgetRefExt;
 use makepad_component::widgets::MpBadgeWidgetRefExt;
 use makepad_component::widgets::MpTabWidgetRefExt;
+use makepad_component::widgets::MpStepWidgetRefExt;
 use makepad_component::widgets::MpCardAction;
 use makepad_component::widgets::MpAvatarWidgetRefExt;
 use makepad_component::widgets::MpModalAction;
@@ -38,6 +39,7 @@ live_design! {
     use makepad_component::widgets::avatar::*;
     use makepad_component::widgets::skeleton::*;
     use makepad_component::widgets::spinner::*;
+    use makepad_component::widgets::steps::*;
     use makepad_component::widgets::accordion::*;
     use makepad_component::widgets::list::*;
     use makepad_component::widgets::notification::*;
@@ -1794,6 +1796,166 @@ live_design! {
 
                             <MpDivider> {}
 
+                            // ===== Steps Section =====
+                            <View> {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 16,
+
+                                <SectionHeader> { text: "Steps" }
+
+                                steps_demo = <MpSteps> {
+                                    current: 1
+                                    step_type: Navigation
+                                    label_placement: Horizontal
+                                    step_spacing: 22.0
+
+                                    step_account = <MpStep> {
+                                        content = {
+                                            title = { text: "Account" }
+                                            description = { text: "Create profile" }
+                                        }
+                                    }
+                                    step_verify = <MpStep> {
+                                        content = {
+                                            title = { text: "Verify" }
+                                            description = { text: "Confirm email" }
+                                        }
+                                    }
+                                    step_billing = <MpStep> {
+                                        content = {
+                                            title = { text: "Billing" }
+                                            description = { text: "Add payment" }
+                                        }
+                                    }
+                                    step_launch = <MpStep> {
+                                        content = {
+                                            title = { text: "Launch" }
+                                            description = { text: "Go live" }
+                                        }
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fit, height: Fit,
+                                    flow: Right,
+                                    spacing: 12,
+                                    align: { y: 0.5 }
+
+                                    steps_next_btn = <MpButtonPrimary> { text: "Next step" }
+                                    steps_status_label = <Label> {
+                                        draw_text: {
+                                            text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                            color: (MUTED_FOREGROUND)
+                                        }
+                                        text: "Current: 1"
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Default" }
+
+                                    <MpSteps> {
+                                        current: 2
+                                        current_status: Process
+
+                                        <MpStep> { content = { title = { text: "Account" } } }
+                                        <MpStep> { content = { title = { text: "Verify" } } }
+                                        <MpStep> { content = { title = { text: "Billing" } } }
+                                        <MpStep> { content = { title = { text: "Launch" } } }
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Small" }
+
+                                    <MpSteps> {
+                                        current: 3
+                                        size: Small
+
+                                        <MpStep> { content = { title = { text: "Draft" } } }
+                                        <MpStep> { content = { title = { text: "Review" } } }
+                                        <MpStep> { content = { title = { text: "Publish" } } }
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Dot" }
+
+                                    <MpSteps> {
+                                        current: 2
+                                        step_type: Dot
+
+                                        <MpStep> { content = { title = { text: "Draft" } } }
+                                        <MpStep> { content = { title = { text: "Review" } } }
+                                        <MpStep> { content = { title = { text: "Publish" } } }
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Arrow" }
+
+                                    <MpSteps> {
+                                        current: 1
+                                        step_type: Arrow
+
+                                        <MpStep> { content = { title = { text: "Start" } } }
+                                        <MpStep> { content = { title = { text: "Confirm" } } }
+                                        <MpStep> { content = { title = { text: "Done" } } }
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    <SubsectionLabel> { text: "Vertical" }
+
+                                    <MpStepsVertical> {
+                                        current: 2
+                                        current_status: Error
+
+                                        <MpStep> {
+                                            content = {
+                                                title = { text: "Order" }
+                                                description = { text: "Submitted" }
+                                            }
+                                        }
+                                        <MpStep> {
+                                            content = {
+                                                title = { text: "Payment" }
+                                                description = { text: "Failed" }
+                                            }
+                                        }
+                                        <MpStep> {
+                                            content = {
+                                                title = { text: "Confirm" }
+                                                description = { text: "Pending" }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            <MpDivider> {}
+
                             // ===== PageFlip Section =====
                             <View> {
                                 width: Fill, height: Fit,
@@ -2933,6 +3095,10 @@ pub struct App {
     current_page: usize,
     #[rust]
     current_category: usize,
+    #[rust]
+    steps_current: i64,
+    #[rust]
+    steps_total: i64,
 }
 
 impl LiveRegister for App {
@@ -2946,12 +3112,16 @@ impl MatchEvent for App {
     fn handle_startup(&mut self, cx: &mut Cx) {
         self.counter = 0;
         self.current_category = 0;
+        self.steps_total = 4;
+        self.steps_current = 1;
 
         // Set initial category tab as selected
         self.ui.mp_tab(ids!(cat_form)).set_selected(cx, true);
 
         // Initialize skeleton in loading state
         self.ui.mp_skeleton_widget(ids!(interactive_skeleton)).set_loading(cx, true);
+
+        self.set_steps_current(cx, self.steps_current);
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -3233,6 +3403,23 @@ impl MatchEvent for App {
         if self.ui.mp_tab(ids!(tab_s_map)).clicked(&actions) {
             self.select_tab(cx, "segmented", 2, "Map");
         }
+
+        // Handle steps demo
+        if self.ui.mp_button(ids!(steps_next_btn)).clicked(&actions) {
+            self.advance_steps(cx);
+        }
+        if let Some(index) = self.ui.mp_step(ids!(steps_demo.step_account)).clicked(&actions) {
+            self.set_steps_current(cx, index);
+        }
+        if let Some(index) = self.ui.mp_step(ids!(steps_demo.step_verify)).clicked(&actions) {
+            self.set_steps_current(cx, index);
+        }
+        if let Some(index) = self.ui.mp_step(ids!(steps_demo.step_billing)).clicked(&actions) {
+            self.set_steps_current(cx, index);
+        }
+        if let Some(index) = self.ui.mp_step(ids!(steps_demo.step_launch)).clicked(&actions) {
+            self.set_steps_current(cx, index);
+        }
     }
 }
 
@@ -3315,6 +3502,27 @@ impl App {
         }
 
         self.ui.redraw(cx);
+    }
+
+    fn set_steps_current(&mut self, cx: &mut Cx, current: i64) {
+        let current = current.clamp(1, self.steps_total);
+        self.steps_current = current;
+        self.ui
+            .widget(ids!(steps_demo))
+            .apply_over(cx, live! { current: (current) });
+        self.ui
+            .label(ids!(steps_status_label))
+            .set_text(cx, &format!("Current: {}", current));
+        self.ui.redraw(cx);
+    }
+
+    fn advance_steps(&mut self, cx: &mut Cx) {
+        let next = if self.steps_current >= self.steps_total {
+            1
+        } else {
+            self.steps_current + 1
+        };
+        self.set_steps_current(cx, next);
     }
 
     fn select_tab(&mut self, cx: &mut Cx, style: &str, index: usize, label: &str) {
