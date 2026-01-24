@@ -35,6 +35,7 @@ live_design! {
     use makepad_component::widgets::page_flip::*;
     use makepad_component::widgets::tab::*;
     use makepad_component::widgets::card::*;
+    use makepad_component::widgets::layout::*;
     use makepad_component::widgets::avatar::*;
     use makepad_component::widgets::skeleton::*;
     use makepad_component::widgets::spinner::*;
@@ -127,6 +128,7 @@ live_design! {
                         <MpTabBarPill> {
                             cat_form = <CategoryTab> { text: "Form" }
                             cat_display = <CategoryTab> { text: "Display" }
+                            cat_layout = <CategoryTab> { text: "Layout" }
                             cat_nav = <CategoryTab> { text: "Navigation" }
                             cat_feedback = <CategoryTab> { text: "Feedback" }
                             cat_data = <CategoryTab> { text: "Data" }
@@ -1689,6 +1691,388 @@ live_design! {
                         }
 
                         // ============================================================
+                        // Layout Page
+                        // ============================================================
+                        page_layout = <ScrollYView> {
+                            width: Fill, height: Fill,
+                            flow: Down,
+                            spacing: 24,
+                            padding: { left: 24, right: 24, top: 24, bottom: 100 }
+
+                            show_bg: true
+                            draw_bg: { color: #fef3c7 }
+
+                            <View> {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 16,
+
+                                <SectionHeader> { text: "Layout" }
+
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 12,
+
+                                    <SubsectionLabel> { text: "Header / Content / Footer" }
+
+                                    <MpLayout> {
+                                        width: Fill, height: Fit,
+
+                                        <MpLayoutHeader> {
+                                            <Label> {
+                                                draw_text: {
+                                                    text_style: <THEME_FONT_BOLD>{ font_size: 14.0 }
+                                                    color: (FOREGROUND)
+                                                }
+                                                text: "Header"
+                                            }
+                                        }
+
+                                        <MpLayoutContent> {
+                                            height: 120,
+                                            <Label> {
+                                                draw_text: {
+                                                    text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+                                                    color: (MUTED_FOREGROUND)
+                                                }
+                                                text: "Content area"
+                                            }
+                                        }
+
+                                        <MpLayoutFooter> {
+                                            <Label> {
+                                                draw_text: {
+                                                    text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                    color: (MUTED_FOREGROUND)
+                                                }
+                                                text: "Footer"
+                                            }
+                                        }
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 12,
+
+                                    <SubsectionLabel> { text: "Left Sider" }
+
+                                    <MpLayout> {
+                                        width: Fill, height: Fit,
+
+                                        <MpLayoutHeader> {
+                                            <Label> {
+                                                draw_text: {
+                                                    text_style: <THEME_FONT_BOLD>{ font_size: 14.0 }
+                                                    color: (FOREGROUND)
+                                                }
+                                                text: "Header"
+                                            }
+                                        }
+
+                                        <MpLayoutBody> {
+                                            height: 200,
+
+                                            <MpLayoutSider> {
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_BOLD>{ font_size: 12.0 }
+                                                        color: (FOREGROUND)
+                                                    }
+                                                    text: "Sider"
+                                                }
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                        color: (MUTED_FOREGROUND)
+                                                    }
+                                                    text: "Overview"
+                                                }
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                        color: (MUTED_FOREGROUND)
+                                                    }
+                                                    text: "Reports"
+                                                }
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                        color: (MUTED_FOREGROUND)
+                                                    }
+                                                    text: "Settings"
+                                                }
+                                            }
+
+                                            <MpLayoutContent> {
+                                                height: Fill,
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+                                                        color: (MUTED_FOREGROUND)
+                                                    }
+                                                    text: "Main content"
+                                                }
+                                            }
+                                        }
+
+                                        <MpLayoutFooter> {
+                                            <Label> {
+                                                draw_text: {
+                                                    text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                    color: (MUTED_FOREGROUND)
+                                                }
+                                                text: "Footer"
+                                            }
+                                        }
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 12,
+
+                                    <SubsectionLabel> { text: "Right Sider" }
+
+                                    <MpLayout> {
+                                        width: Fill, height: Fit,
+
+                                        <MpLayoutHeader> {
+                                            <Label> {
+                                                draw_text: {
+                                                    text_style: <THEME_FONT_BOLD>{ font_size: 14.0 }
+                                                    color: (FOREGROUND)
+                                                }
+                                                text: "Header"
+                                            }
+                                        }
+
+                                        <MpLayoutBody> {
+                                            height: 200,
+
+                                            <MpLayoutContent> {
+                                                height: Fill,
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+                                                        color: (MUTED_FOREGROUND)
+                                                    }
+                                                    text: "Main content"
+                                                }
+                                                <View> {
+                                                    width: Fit, height: Fit,
+                                                    flow: Right,
+                                                    spacing: 12
+
+                                                    <RoundedView> {
+                                                        width: 120, height: 48,
+                                                        align: { x: 0.5, y: 0.5 }
+                                                        draw_bg: {
+                                                            color: #e2e8f0
+                                                            border_radius: 8.0
+                                                        }
+                                                        <Label> {
+                                                            draw_text: {
+                                                                text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                                color: (MUTED_FOREGROUND)
+                                                            }
+                                                            text: "Card A"
+                                                        }
+                                                    }
+
+                                                    <RoundedView> {
+                                                        width: 120, height: 48,
+                                                        align: { x: 0.5, y: 0.5 }
+                                                        draw_bg: {
+                                                            color: #e2e8f0
+                                                            border_radius: 8.0
+                                                        }
+                                                        <Label> {
+                                                            draw_text: {
+                                                                text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                                color: (MUTED_FOREGROUND)
+                                                            }
+                                                            text: "Card B"
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            <MpLayoutSiderRight> {
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_BOLD>{ font_size: 12.0 }
+                                                        color: (FOREGROUND)
+                                                    }
+                                                    text: "Sider"
+                                                }
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                        color: (MUTED_FOREGROUND)
+                                                    }
+                                                    text: "Filters"
+                                                }
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                        color: (MUTED_FOREGROUND)
+                                                    }
+                                                    text: "Profile"
+                                                }
+                                            }
+                                        }
+
+                                        <MpLayoutFooter> {
+                                            <Label> {
+                                                draw_text: {
+                                                    text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                    color: (MUTED_FOREGROUND)
+                                                }
+                                                text: "Footer"
+                                            }
+                                        }
+                                    }
+                                }
+
+                                <View> {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 12,
+
+                                    <SubsectionLabel> { text: "Double Sider" }
+
+                                    <MpLayout> {
+                                        width: Fill, height: Fit,
+
+                                        <MpLayoutHeader> {
+                                            <Label> {
+                                                draw_text: {
+                                                    text_style: <THEME_FONT_BOLD>{ font_size: 14.0 }
+                                                    color: (FOREGROUND)
+                                                }
+                                                text: "Header"
+                                            }
+                                        }
+
+                                        <MpLayoutBody> {
+                                            height: 220,
+
+                                            <MpLayoutSider> {
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_BOLD>{ font_size: 12.0 }
+                                                        color: (FOREGROUND)
+                                                    }
+                                                    text: "Navigation"
+                                                }
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                        color: (MUTED_FOREGROUND)
+                                                    }
+                                                    text: "Inbox"
+                                                }
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                        color: (MUTED_FOREGROUND)
+                                                    }
+                                                    text: "Projects"
+                                                }
+                                            }
+
+                                            <MpLayoutContent> {
+                                                height: Fill,
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+                                                        color: (MUTED_FOREGROUND)
+                                                    }
+                                                    text: "Content area"
+                                                }
+                                                <View> {
+                                                    width: Fit, height: Fit,
+                                                    flow: Right,
+                                                    spacing: 12
+
+                                                    <RoundedView> {
+                                                        width: 140, height: 60,
+                                                        align: { x: 0.5, y: 0.5 }
+                                                        draw_bg: {
+                                                            color: #e2e8f0
+                                                            border_radius: 10.0
+                                                        }
+                                                        <Label> {
+                                                            draw_text: {
+                                                                text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                                color: (MUTED_FOREGROUND)
+                                                            }
+                                                            text: "Block 1"
+                                                        }
+                                                    }
+
+                                                    <RoundedView> {
+                                                        width: 140, height: 60,
+                                                        align: { x: 0.5, y: 0.5 }
+                                                        draw_bg: {
+                                                            color: #e2e8f0
+                                                            border_radius: 10.0
+                                                        }
+                                                        <Label> {
+                                                            draw_text: {
+                                                                text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                                color: (MUTED_FOREGROUND)
+                                                            }
+                                                            text: "Block 2"
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            <MpLayoutSiderRight> {
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_BOLD>{ font_size: 12.0 }
+                                                        color: (FOREGROUND)
+                                                    }
+                                                    text: "Details"
+                                                }
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                        color: (MUTED_FOREGROUND)
+                                                    }
+                                                    text: "Activity"
+                                                }
+                                                <Label> {
+                                                    draw_text: {
+                                                        text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                        color: (MUTED_FOREGROUND)
+                                                    }
+                                                    text: "Notes"
+                                                }
+                                            }
+                                        }
+
+                                        <MpLayoutFooter> {
+                                            <Label> {
+                                                draw_text: {
+                                                    text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
+                                                    color: (MUTED_FOREGROUND)
+                                                }
+                                                text: "Footer"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ============================================================
                         // Navigation Page
                         // ============================================================
                         page_nav = <ScrollYView> {
@@ -2962,14 +3346,17 @@ impl MatchEvent for App {
         if self.ui.mp_tab(ids!(cat_display)).clicked(&actions) {
             self.select_category(cx, 1);
         }
-        if self.ui.mp_tab(ids!(cat_nav)).clicked(&actions) {
+        if self.ui.mp_tab(ids!(cat_layout)).clicked(&actions) {
             self.select_category(cx, 2);
         }
-        if self.ui.mp_tab(ids!(cat_feedback)).clicked(&actions) {
+        if self.ui.mp_tab(ids!(cat_nav)).clicked(&actions) {
             self.select_category(cx, 3);
         }
-        if self.ui.mp_tab(ids!(cat_data)).clicked(&actions) {
+        if self.ui.mp_tab(ids!(cat_feedback)).clicked(&actions) {
             self.select_category(cx, 4);
+        }
+        if self.ui.mp_tab(ids!(cat_data)).clicked(&actions) {
+            self.select_category(cx, 5);
         }
 
         // Handle counter button
@@ -3243,17 +3630,19 @@ impl App {
         // Update tab selected states
         self.ui.mp_tab(ids!(cat_form)).set_selected(cx, index == 0);
         self.ui.mp_tab(ids!(cat_display)).set_selected(cx, index == 1);
-        self.ui.mp_tab(ids!(cat_nav)).set_selected(cx, index == 2);
-        self.ui.mp_tab(ids!(cat_feedback)).set_selected(cx, index == 3);
-        self.ui.mp_tab(ids!(cat_data)).set_selected(cx, index == 4);
+        self.ui.mp_tab(ids!(cat_layout)).set_selected(cx, index == 2);
+        self.ui.mp_tab(ids!(cat_nav)).set_selected(cx, index == 3);
+        self.ui.mp_tab(ids!(cat_feedback)).set_selected(cx, index == 4);
+        self.ui.mp_tab(ids!(cat_data)).set_selected(cx, index == 5);
 
         // Switch page
         let page_id = match index {
             0 => id!(page_form),
             1 => id!(page_display),
-            2 => id!(page_nav),
-            3 => id!(page_feedback),
-            4 => id!(page_data),
+            2 => id!(page_layout),
+            3 => id!(page_nav),
+            4 => id!(page_feedback),
+            5 => id!(page_data),
             _ => id!(page_form),
         };
         self.ui.page_flip(ids!(category_pages)).set_active_page(cx, page_id);

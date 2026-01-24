@@ -8,6 +8,7 @@ pub mod checkbox;
 pub mod divider;
 pub mod dropdown;
 pub mod input;
+pub mod layout;
 pub mod label;
 pub mod list;
 pub mod modal;
@@ -47,7 +48,7 @@ pub use modal::*;
 pub use notification::*;
 pub use skeleton::*;
 pub use popover::*;
-// dropdown, list 只定义 live_design 样式
+// dropdown, layout, list 只定义 live_design 样式
 
 use makepad_widgets::Cx;
 
@@ -62,6 +63,7 @@ pub fn live_design(cx: &mut Cx) {
     crate::widgets::divider::live_design(cx);
     crate::widgets::dropdown::live_design(cx);
     crate::widgets::input::live_design(cx);
+    crate::widgets::layout::live_design(cx);
     crate::widgets::label::live_design(cx);
     crate::widgets::list::live_design(cx);
     crate::widgets::modal::live_design(cx);
