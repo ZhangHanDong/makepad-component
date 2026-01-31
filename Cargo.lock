@@ -3,6 +3,16 @@
 version = 4
 
 [[package]]
+name = "a2ui-demo"
+version = "0.1.0"
+dependencies = [
+ "makepad-component",
+ "makepad-widgets",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "ab_glyph_rasterizer"
 version = "0.1.8"
 source = "git+https://github.com/makepad/makepad?branch=dev#20b8635520f77e3b730d572a5a39215f86bc146b"
@@ -275,6 +285,8 @@ name = "makepad-component"
 version = "0.1.0"
 dependencies = [
  "makepad-widgets",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

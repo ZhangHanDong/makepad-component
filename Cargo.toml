@@ -2,6 +2,7 @@
 members = [
     "crates/ui",
     "crates/component-zoo",
+    "crates/a2ui-demo",
 ]
 resolver = "2"
 

@@ -16,4 +16,4 @@ node_modules/
 # Cargo lock for library (optional - uncomment if needed)
 # Cargo.lock
 .claude
-.codex
+.codexdebug/
