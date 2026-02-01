@@ -742,6 +742,12 @@ impl A2uiSurface {
         }
     }
 
+    /// Clear all surfaces and reset the processor
+    pub fn clear(&mut self) {
+        // Reset the processor to clear all surfaces and components
+        self.processor = Some(A2uiMessageProcessor::with_standard_catalog());
+    }
+
     /// Load image textures from LiveDependency resources
     fn load_image_textures(&mut self, cx: &mut Cx) {
         use makepad_widgets::image_cache::ImageBuffer;

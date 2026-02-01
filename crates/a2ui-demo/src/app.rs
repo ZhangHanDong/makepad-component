@@ -1,6 +1,8 @@
 //! A2UI Demo Application
 //!
-//! Demonstrates the A2UI protocol rendering with a shopping product list example.
+//! Demonstrates the A2UI protocol rendering with:
+//! - Static mode: Load JSON data directly
+//! - Streaming mode: Connect to A2A server for real-time UI updates
 
 use makepad_component::a2ui::*;
 use makepad_widgets::*;
@@ -52,20 +54,45 @@ live_design! {
                         }
                     }
 
-                    // Load button
-                    load_btn = <Button> {
-                        text: "Load A2UI Data"
-                        draw_text: {
-                            color: #FFFFFF
+                    // Control buttons row
+                    <View> {
+                        width: Fill
+                        height: Fit
+                        flow: Right
+                        spacing: 10.0
+
+                        // Load static data button
+                        load_btn = <Button> {
+                            text: "Load Static Data"
+                            draw_text: { color: #FFFFFF }
+                            draw_bg: { color: #0066CC }
                         }
-                        draw_bg: {
-                            color: #0066CC
+
+                        // Connect to server button
+                        connect_btn = <Button> {
+                            text: "Connect to Server"
+                            draw_text: { color: #FFFFFF }
+                            draw_bg: { color: #00AA66 }
+                        }
+
+                        // Disconnect button
+                        disconnect_btn = <Button> {
+                            text: "Disconnect"
+                            draw_text: { color: #FFFFFF }
+                            draw_bg: { color: #CC3333 }
+                            visible: false
+                        }
+
+                        // Server URL input
+                        server_url = <Label> {
+                            text: "http://localhost:8080/rpc"
+                            draw_text: { color: #888888 }
                         }
                     }
 
                     // Status label
                     status_label = <Label> {
-                        text: "Click button to load A2UI data"
+                        text: "Click a button to load A2UI data or connect to server"
                         draw_text: { color: #888888 }
                     }
 
@@ -99,6 +126,12 @@ pub struct App {
 
     #[rust]
     loaded: bool,
+
+    #[rust]
+    host: Option<A2uiHost>,
+
+    #[rust]
+    is_streaming: bool,
 }
 
 impl LiveRegister for App {
@@ -110,9 +143,19 @@ impl LiveRegister for App {
 
 impl App {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
-        // Handle "Load Demo" button click
+        // Handle "Load Static Data" button click
         if self.ui.button(ids!(load_btn)).clicked(&actions) {
             self.load_a2ui_data(cx);
+        }
+
+        // Handle "Connect to Server" button click
+        if self.ui.button(ids!(connect_btn)).clicked(&actions) {
+            self.connect_to_server(cx);
+        }
+
+        // Handle "Disconnect" button click
+        if self.ui.button(ids!(disconnect_btn)).clicked(&actions) {
+            self.disconnect(cx);
         }
 
         // Handle A2UI surface actions
@@ -120,16 +163,32 @@ impl App {
         if let Some(item) = actions.find_widget_action(surface_ref.widget_uid()) {
             match item.cast::<A2uiSurfaceAction>() {
                 A2uiSurfaceAction::UserAction(user_action) => {
-                    // Handle "addToCart" action
-                    if user_action.action.name == "addToCart" {
-                        if let Some(product_id) = user_action.action.context.get("productId") {
+                    // If connected to server, forward the action
+                    if let Some(host) = &mut self.host {
+                        if let Err(e) = host.send_action(&user_action) {
+                            log!("Failed to send action to server: {}", e);
+                        }
+                        self.ui.label(ids!(status_label)).set_text(
+                            cx,
+                            &format!("📤 Sent action: {}", user_action.action.name),
+                        );
+                    } else {
+                        // Handle locally (static mode)
+                        if user_action.action.name == "addToCart" {
+                            if let Some(product_id) = user_action.action.context.get("productId") {
+                                self.ui.label(ids!(status_label)).set_text(
+                                    cx,
+                                    &format!("🛒 Added product {} to cart!", product_id),
+                                );
+                            }
+                        } else {
                             self.ui.label(ids!(status_label)).set_text(
                                 cx,
-                                &format!("🛒 Added product {} to cart!", product_id),
+                                &format!("🎯 Action: {}", user_action.action.name),
                             );
-                            self.ui.redraw(cx);
                         }
                     }
+                    self.ui.redraw(cx);
                 }
                 A2uiSurfaceAction::DataModelChanged { surface_id, path, value } => {
                     // Update the data model with the new value
@@ -160,9 +219,102 @@ impl App {
         }
     }
 
-    fn load_a2ui_data(&mut self, cx: &mut Cx) {
-        if self.loaded {
+    fn connect_to_server(&mut self, cx: &mut Cx) {
+        // Always disconnect first to allow reconnection
+        if self.host.is_some() {
+            log!("connect_to_server: Clearing existing host");
+            self.host = None;
+        }
+
+        // Clear the surface before connecting
+        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
+            surface.clear();
+        }
+
+        let config = A2uiHostConfig {
+            url: "http://localhost:8080/rpc".to_string(),
+            auth_token: None,
+        };
+
+        let mut host = A2uiHost::new(config);
+
+        match host.connect("Show me a product catalog UI") {
+            Ok(()) => {
+                self.ui.label(ids!(status_label)).set_text(cx, "🔗 Connecting to server...");
+                self.host = Some(host);
+                self.is_streaming = true;
+                self.loaded = false; // Reset loaded flag so static data can be reloaded
+            }
+            Err(e) => {
+                self.ui.label(ids!(status_label)).set_text(cx, &format!("❌ Connection failed: {}", e));
+            }
+        }
+
+        self.ui.redraw(cx);
+    }
+
+    fn disconnect(&mut self, cx: &mut Cx) {
+        self.host = None;
+        self.is_streaming = false;
+        self.ui.label(ids!(status_label)).set_text(cx, "🔌 Disconnected from server");
+        self.ui.redraw(cx);
+    }
+
+    fn poll_host(&mut self, cx: &mut Cx) {
+        let Some(host) = &mut self.host else {
             return;
+        };
+
+        let events = host.poll_all();
+        if events.is_empty() {
+            return;
+        }
+
+        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+
+        for event in events {
+            match event {
+                A2uiHostEvent::Connected => {
+                    self.ui.label(ids!(status_label)).set_text(cx, "✅ Connected! Receiving UI...");
+                }
+                A2uiHostEvent::Message(msg) => {
+                    if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
+                        let events = surface.process_message(msg);
+                        log!("Processed streaming message, {} events", events.len());
+                    }
+                    self.ui.label(ids!(status_label)).set_text(cx, "📥 Receiving UI updates...");
+                }
+                A2uiHostEvent::TaskStatus { task_id, state } => {
+                    self.ui.label(ids!(status_label)).set_text(
+                        cx,
+                        &format!("📋 Task {}: {}", task_id, state),
+                    );
+                }
+                A2uiHostEvent::Error(e) => {
+                    self.ui.label(ids!(status_label)).set_text(cx, &format!("❌ Error: {}", e));
+                }
+                A2uiHostEvent::Disconnected => {
+                    self.ui.label(ids!(status_label)).set_text(cx, "🔌 Server disconnected");
+                    self.host = None;
+                    self.is_streaming = false;
+                }
+            }
+        }
+
+        self.ui.redraw(cx);
+    }
+
+    fn load_a2ui_data(&mut self, cx: &mut Cx) {
+        // Disconnect from server if connected
+        if self.host.is_some() {
+            self.disconnect(cx);
+        }
+
+        // Clear the surface before loading new data
+        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
+            surface.clear();
         }
 
         // Sample A2UI JSON for a product catalog
@@ -194,11 +346,11 @@ impl App {
         // Update status label
         if let Some(count) = result {
             self.ui.label(ids!(status_label))
-                .set_text(cx, &format!("Loaded! {} A2UI events processed.", count));
+                .set_text(cx, &format!("📦 Loaded static data! {} events processed.", count));
             self.loaded = true;
         } else {
             self.ui.label(ids!(status_label))
-                .set_text(cx, "Error loading A2UI data");
+                .set_text(cx, "❌ Error loading A2UI data");
         }
 
         self.ui.redraw(cx);
@@ -207,9 +359,14 @@ impl App {
 
 impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
-        // Auto-load on startup for automated testing
+        // Auto-load static data on startup
         if let Event::Startup = event {
             self.load_a2ui_data(cx);
+        }
+
+        // Poll for streaming messages when connected
+        if self.host.is_some() {
+            self.poll_host(cx);
         }
 
         // Capture actions from UI event handling

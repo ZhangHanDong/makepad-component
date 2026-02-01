@@ -122,12 +122,16 @@ impl A2uiHost {
                     }
                     if let A2uiHostEvent::Disconnected = event {
                         self.is_connected = false;
+                        // Clear receiver to prevent returning Disconnected repeatedly
+                        self.event_receiver = None;
                     }
                     Some(event)
                 }
                 Err(TryRecvError::Empty) => None,
                 Err(TryRecvError::Disconnected) => {
                     self.is_connected = false;
+                    // Clear receiver to prevent returning Disconnected repeatedly
+                    self.event_receiver = None;
                     Some(A2uiHostEvent::Disconnected)
                 }
             }

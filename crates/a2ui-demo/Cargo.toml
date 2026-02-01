@@ -4,6 +4,14 @@ version.workspace = true
 edition.workspace = true
 description = "A2UI protocol demo for Makepad"
 
+[[bin]]
+name = "a2ui-demo"
+path = "src/main.rs"
+
+[[bin]]
+name = "a2ui-streaming"
+path = "src/streaming_main.rs"
+
 [dependencies]
 makepad-component = { workspace = true }
 makepad-widgets = { workspace = true }
