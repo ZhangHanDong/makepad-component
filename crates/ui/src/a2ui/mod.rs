@@ -40,6 +40,9 @@ mod processor;
 mod registry;
 mod surface;
 mod value;
+mod sse;
+mod a2a_client;
+mod host;
 
 pub use message::*;
 pub use data_model::*;
@@ -47,6 +50,9 @@ pub use processor::*;
 pub use registry::*;
 pub use surface::*;
 pub use value::*;
+pub use sse::*;
+pub use a2a_client::*;
+pub use host::*;
 
 use makepad_widgets::Cx;
 
