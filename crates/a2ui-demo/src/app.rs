@@ -6,6 +6,8 @@
 
 use makepad_component::a2ui::*;
 use makepad_widgets::*;
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
 
 live_design! {
     use link::theme::*;
@@ -70,14 +72,14 @@ live_design! {
 
                         // Connect to server button
                         connect_btn = <Button> {
-                            text: "💳 Payment Checkout"
+                            text: "🎨 Live Editor"
                             draw_text: { color: #FFFFFF }
                             draw_bg: { color: #00AA66 }
                         }
 
                         // Server URL input
                         server_url = <Label> {
-                            text: "localhost:8080"
+                            text: "localhost:8081"
                             draw_text: { color: #666666 }
                         }
                     }
@@ -130,6 +132,15 @@ pub struct App {
 
     #[rust]
     is_streaming: bool,
+
+    #[rust]
+    live_mode: bool,
+
+    #[rust]
+    last_poll_time: f64,
+
+    #[rust]
+    last_content_hash: u64,
 }
 
 impl LiveRegister for App {
@@ -263,21 +274,23 @@ impl App {
         }
 
         // Update title for streaming mode
-        self.ui.label(ids!(title_label)).set_text(cx, "💳 Payment Checkout");
+        self.ui.label(ids!(title_label)).set_text(cx, "🎨 Live A2UI Editor");
 
         let config = A2uiHostConfig {
-            url: "http://localhost:8080/rpc".to_string(),
+            url: "http://localhost:8081/rpc".to_string(),
             auth_token: None,
         };
 
         let mut host = A2uiHost::new(config);
 
-        match host.connect("Show me a payment checkout UI") {
+        match host.connect("Live mode") {
             Ok(()) => {
-                self.ui.label(ids!(status_label)).set_text(cx, "🔗 Connecting to payment server...");
+                self.ui.label(ids!(status_label)).set_text(cx, "🔗 Connecting to live server...");
                 self.host = Some(host);
                 self.is_streaming = true;
-                self.loaded = false; // Reset loaded flag so static data can be reloaded
+                self.live_mode = true;
+                self.last_poll_time = cx.seconds_since_app_start();
+                self.loaded = false;
             }
             Err(e) => {
                 self.ui.label(ids!(status_label)).set_text(cx, &format!("❌ Connection failed: {}", e));
@@ -285,6 +298,26 @@ impl App {
         }
 
         self.ui.redraw(cx);
+    }
+
+    fn reconnect_live(&mut self, cx: &mut Cx) {
+        // Reconnect to get updates (don't clear surface - we want incremental updates)
+        let config = A2uiHostConfig {
+            url: "http://localhost:8081/rpc".to_string(),
+            auth_token: None,
+        };
+
+        let mut host = A2uiHost::new(config);
+
+        match host.connect("Live poll") {
+            Ok(()) => {
+                self.host = Some(host);
+                self.is_streaming = true;
+            }
+            Err(_) => {
+                // Silent retry on failure
+            }
+        }
     }
 
     fn disconnect(&mut self, cx: &mut Cx) {
@@ -305,13 +338,33 @@ impl App {
         }
 
         let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let mut needs_redraw = false;
 
         for event in events {
             match event {
                 A2uiHostEvent::Connected => {
-                    self.ui.label(ids!(status_label)).set_text(cx, "💳 Connected! Loading payment page...");
+                    if self.live_mode {
+                        self.ui.label(ids!(status_label)).set_text(cx, "🎨 Connected to live server...");
+                    } else {
+                        self.ui.label(ids!(status_label)).set_text(cx, "💳 Connected! Loading payment page...");
+                    }
+                    needs_redraw = true;
                 }
                 A2uiHostEvent::Message(msg) => {
+                    // Compute hash of message content to detect duplicates
+                    let content_hash = {
+                        let mut hasher = DefaultHasher::new();
+                        format!("{:?}", msg).hash(&mut hasher);
+                        hasher.finish()
+                    };
+
+                    // Skip if content hasn't changed
+                    if content_hash == self.last_content_hash {
+                        log!("Skipping duplicate content (hash: {})", content_hash);
+                        continue;
+                    }
+                    self.last_content_hash = content_hash;
+
                     log!("Received A2uiMessage: {:?}", msg);
                     if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
                         let events = surface.process_message(msg);
@@ -322,7 +375,12 @@ impl App {
                     } else {
                         log!("ERROR: Could not borrow A2uiSurface!");
                     }
-                    self.ui.label(ids!(status_label)).set_text(cx, "💳 Streaming payment UI...");
+                    if self.live_mode {
+                        self.ui.label(ids!(status_label)).set_text(cx, "🎨 UI Updated from ui_live.json");
+                    } else {
+                        self.ui.label(ids!(status_label)).set_text(cx, "💳 Streaming payment UI...");
+                    }
+                    needs_redraw = true;
                 }
                 A2uiHostEvent::TaskStatus { task_id: _, state } => {
                     if state == "completed" {
@@ -330,19 +388,29 @@ impl App {
                     } else {
                         self.ui.label(ids!(status_label)).set_text(cx, &format!("💳 {}", state));
                     }
+                    needs_redraw = true;
                 }
                 A2uiHostEvent::Error(e) => {
                     self.ui.label(ids!(status_label)).set_text(cx, &format!("❌ Error: {}", e));
+                    needs_redraw = true;
                 }
                 A2uiHostEvent::Disconnected => {
-                    self.ui.label(ids!(status_label)).set_text(cx, "⚫ Disconnected from server");
                     self.host = None;
                     self.is_streaming = false;
+                    if self.live_mode {
+                        self.ui.label(ids!(status_label)).set_text(cx, "🔄 Live mode - watching for changes...");
+                    } else {
+                        self.ui.label(ids!(status_label)).set_text(cx, "⚫ Disconnected from server");
+                    }
+                    needs_redraw = true;
                 }
             }
         }
 
-        self.ui.redraw(cx);
+        // Only redraw if content actually changed
+        if needs_redraw {
+            self.ui.redraw(cx);
+        }
     }
 
     fn load_a2ui_data(&mut self, cx: &mut Cx) {
@@ -350,6 +418,7 @@ impl App {
         if self.host.is_some() {
             self.disconnect(cx);
         }
+        self.live_mode = false;
 
         // Clear the surface before loading new data
         let surface_ref = self.ui.widget(ids!(a2ui_surface));
@@ -402,14 +471,28 @@ impl App {
 
 impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
-        // Auto-load static data on startup
+        // Auto-connect to live server on startup
         if let Event::Startup = event {
-            self.load_a2ui_data(cx);
+            self.connect_to_server(cx);
         }
 
         // Poll for streaming messages when connected
         if self.host.is_some() {
             self.poll_host(cx);
+        }
+
+        // Live mode: keep the event loop running for polling
+        if self.live_mode {
+            if self.host.is_none() {
+                // Reconnect periodically to get updates
+                let current_time = cx.seconds_since_app_start();
+                if current_time - self.last_poll_time > 1.0 {
+                    self.last_poll_time = current_time;
+                    self.reconnect_live(cx);
+                }
+            }
+            // Always request next frame to keep polling loop active
+            cx.new_next_frame();
         }
 
         // Capture actions from UI event handling

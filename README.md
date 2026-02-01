@@ -189,6 +189,124 @@ Then:
 
 ![A2UI Demo](docs/a2ui-demo.png)
 
+### Kimi A2UI Bridge (LLM-Powered UI Generation)
+
+Generate native UIs from natural language using Kimi K2.5's tool-calling capabilities.
+
+#### Architecture
+
+```
+┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
+│   User Chat     │────▶│   Kimi Bridge       │────▶│   Kimi K2.5     │
+│   (curl)        │     │   (localhost:8081)  │     │   (Tool Calls)  │
+└─────────────────┘     └──────────┬──────────┘     └────────┬────────┘
+                                   │                         │
+                                   │◀────────────────────────┘
+                                   ▼
+                        ┌─────────────────────┐
+                        │   A2UI JSON         │
+                        │   (Adjacency List)  │
+                        └──────────┬──────────┘
+                                   │
+                                   ▼
+                        ┌─────────────────────┐
+                        │   Makepad App       │
+                        │   (Native UI)       │
+                        └─────────────────────┘
+```
+
+#### Quick Start
+
+```bash
+# Terminal 1: Start the Kimi Bridge Server
+export MOONSHOT_API_KEY="your-api-key"
+cargo run --bin kimi-bridge --features kimi-bridge
+
+# Terminal 2: Start the Makepad App
+cargo run --bin a2ui-demo
+
+# Terminal 3: Generate UI via Chat
+curl -X POST http://127.0.0.1:8081/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Create a music player with play/pause buttons and volume slider"}'
+```
+
+The Makepad app automatically updates to show the new UI.
+
+#### Example UIs
+
+```bash
+# Music Player
+curl -X POST http://127.0.0.1:8081/chat \
+  -d '{"message": "Create a music player with controls and volume"}'
+
+# Payment Form
+curl -X POST http://127.0.0.1:8081/chat \
+  -d '{"message": "Create a payment form with card number, expiry, cvv"}'
+
+# Health Tracker
+curl -X POST http://127.0.0.1:8081/chat \
+  -d '{"message": "Create a health app with steps, water intake, sleep tracking"}'
+
+# Stock Watchlist
+curl -X POST http://127.0.0.1:8081/chat \
+  -d '{"message": "Create a stock app with watchlist and buy/sell buttons"}'
+
+# Travel Booking
+curl -X POST http://127.0.0.1:8081/chat \
+  -d '{"message": "Create a travel app with flight search and destinations"}'
+```
+
+#### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/chat` | POST | Send natural language to generate UI |
+| `/rpc` | POST | A2A protocol endpoint (returns latest UI) |
+| `/status` | GET | Server health check |
+| `/reset` | POST | Clear conversation history |
+
+#### Data Flow
+
+```
+1. User sends: POST /chat {"message": "Create a login form"}
+2. Kimi Bridge calls Kimi K2.5 API with 10 tools:
+   - create_text, create_button, create_textfield
+   - create_slider, create_checkbox
+   - create_row, create_column, create_card
+   - set_data, render_ui
+3. Kimi returns tool calls: [create_text(...), create_button(...), ...]
+4. Bridge converts to A2UI JSON (adjacency list format)
+5. Makepad app polls /rpc → receives A2UI → renders native UI
+```
+
+#### A2UI JSON Format
+
+```json
+[
+  {"beginRendering": {"root": "main-layout", "surfaceId": "main"}},
+  {"surfaceUpdate": {
+    "surfaceId": "main",
+    "components": [
+      {"id": "title", "component": {"Text": {"text": {"literalString": "Hello"}, "usageHint": "h1"}}},
+      {"id": "btn", "component": {"Button": {"child": "btn-text", "action": {"name": "click"}, "primary": true}}},
+      {"id": "main-layout", "component": {"Column": {"children": {"explicitList": ["title", "btn"]}}}}
+    ]
+  }},
+  {"dataModelUpdate": {"surfaceId": "main", "path": "/", "contents": [{"key": "volume", "valueNumber": 50}]}}
+]
+```
+
+#### A2A Protocol (SSE Response)
+
+```
+data: {"jsonrpc":"2.0","result":{"kind":"task","id":"kimi-task","status":{"state":"running"}}}
+data: {"jsonrpc":"2.0","result":{"kind":"event","taskId":"kimi-task","data":{"beginRendering":{...}}}}
+data: {"jsonrpc":"2.0","result":{"kind":"event","taskId":"kimi-task","data":{"surfaceUpdate":{...}}}}
+```
+
+See [Kimi A2UI Bridge Documentation](docs/KIMI_A2UI_BRIDGE.md) for full details.
+
 ---
 
 ## Claude Code Skills
