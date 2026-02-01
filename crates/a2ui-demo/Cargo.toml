@@ -16,6 +16,14 @@ path = "src/streaming_main.rs"
 name = "mock-a2a-server"
 path = "src/mock_server.rs"
 
+[[bin]]
+name = "watch-server"
+path = "src/watch_server.rs"
+
+[[bin]]
+name = "kimi-bridge"
+path = "src/kimi_bridge.rs"
+
 [dependencies]
 makepad-component = { workspace = true }
 makepad-widgets = { workspace = true }
@@ -27,7 +35,9 @@ tokio = { version = "1", features = ["full"], optional = true }
 hyper = { version = "1", features = ["full"], optional = true }
 hyper-util = { version = "0.1", features = ["tokio"], optional = true }
 http-body-util = { version = "0.1", optional = true }
+reqwest = { version = "0.11", features = ["json"], optional = true }
 
 [features]
 default = []
 mock-server = ["tokio", "hyper", "hyper-util", "http-body-util"]
+kimi-bridge = ["tokio", "hyper", "hyper-util", "http-body-util", "reqwest"]
