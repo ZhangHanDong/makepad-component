@@ -121,6 +121,12 @@ pub enum A2uiSurfaceAction {
         path: String,
         value: serde_json::Value,
     },
+    /// Audio player play button clicked - open URL in browser
+    PlayAudio {
+        component_id: String,
+        url: String,
+        title: String,
+    },
 }
 
 live_design! {
@@ -833,6 +839,26 @@ pub struct A2uiSurface {
     /// Currently hovered slider index
     #[rust]
     hovered_slider_idx: Option<usize>,
+
+    // ============================================================================
+    // AudioPlayer state tracking
+    // ============================================================================
+
+    /// AudioPlayer button areas for event detection (play buttons)
+    #[rust]
+    audio_player_areas: Vec<Area>,
+
+    /// AudioPlayer metadata: (component_id, audio_url, title)
+    #[rust]
+    audio_player_data: Vec<(String, String, String)>,
+
+    /// Currently hovered audio player index
+    #[rust]
+    hovered_audio_player_idx: Option<usize>,
+
+    /// Currently playing audio URL (for Play/Stop toggle)
+    #[rust]
+    playing_url: Option<String>,
 }
 
 impl A2uiSurface {
@@ -1007,6 +1033,16 @@ impl A2uiSurface {
     /// Get mutable processor
     pub fn processor_mut(&mut self) -> Option<&mut A2uiMessageProcessor> {
         self.processor.as_mut()
+    }
+
+    /// Set the currently playing audio URL (for Play/Stop toggle display)
+    pub fn set_playing_url(&mut self, url: Option<String>) {
+        self.playing_url = url;
+    }
+
+    /// Get the currently playing audio URL
+    pub fn playing_url(&self) -> Option<&String> {
+        self.playing_url.as_ref()
     }
 
     /// Process A2UI JSON messages
@@ -1256,6 +1292,48 @@ impl Widget for A2uiSurface {
             }
         }
 
+        // Handle audio player events
+        for (idx, area) in self.audio_player_areas.iter().enumerate() {
+            match event.hits(cx, *area) {
+                Hit::FingerHoverIn(_) => {
+                    if self.hovered_audio_player_idx != Some(idx) {
+                        self.hovered_audio_player_idx = Some(idx);
+                        cx.set_cursor(MouseCursor::Hand);
+                        needs_redraw = true;
+                    }
+                }
+                Hit::FingerHoverOut(_) => {
+                    if self.hovered_audio_player_idx == Some(idx) {
+                        self.hovered_audio_player_idx = None;
+                        cx.set_cursor(MouseCursor::Default);
+                        needs_redraw = true;
+                    }
+                }
+                Hit::FingerDown(_) => {
+                    self.hovered_audio_player_idx = Some(idx);
+                    needs_redraw = true;
+                }
+                Hit::FingerUp(fe) => {
+                    if fe.is_over {
+                        // Emit PlayAudio action
+                        if let Some((component_id, url, title)) = self.audio_player_data.get(idx).cloned() {
+                            cx.widget_action(
+                                self.widget_uid(),
+                                &scope.path,
+                                A2uiSurfaceAction::PlayAudio {
+                                    component_id,
+                                    url,
+                                    title,
+                                },
+                            );
+                        }
+                        needs_redraw = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+
         // Handle slider events
         for (idx, area) in self.slider_areas.iter().enumerate() {
             match event.hits(cx, *area) {
@@ -1348,6 +1426,7 @@ impl Widget for A2uiSurface {
         self.text_field_data.clear();
         self.checkbox_data.clear();
         self.slider_data.clear();
+        self.audio_player_data.clear();
 
         self.draw_bg.begin(cx, walk, self.layout);
 
@@ -1405,6 +1484,11 @@ impl Widget for A2uiSurface {
             self.slider_areas.truncate(current_slider_count);
         }
 
+        let current_audio_player_count = self.audio_player_data.len();
+        if current_audio_player_count < self.audio_player_areas.len() {
+            self.audio_player_areas.truncate(current_audio_player_count);
+        }
+
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
 
@@ -1459,6 +1543,9 @@ impl A2uiSurface {
             }
             ComponentType::List(list) => {
                 self.render_list(cx, scope, surface, data_model, list);
+            }
+            ComponentType::AudioPlayer(audio_player) => {
+                self.render_audio_player(cx, audio_player, data_model, component_id);
             }
             _ => {
                 // Unsupported component - skip for now
@@ -2261,6 +2348,164 @@ impl A2uiSurface {
 
         cx.end_turtle();
     }
+
+    // ============================================================================
+    // AudioPlayer Rendering
+    // ============================================================================
+
+    fn render_audio_player(
+        &mut self,
+        cx: &mut Cx2d,
+        audio_player: &AudioPlayerComponent,
+        data_model: &DataModel,
+        component_id: &str,
+    ) {
+        let audio_player_idx = self.audio_player_data.len();
+        let is_hovered = self.hovered_audio_player_idx == Some(audio_player_idx);
+
+        // Resolve URL and title
+        let url = resolve_string_value_scoped(
+            &audio_player.url,
+            data_model,
+            self.current_scope.as_deref(),
+        );
+
+        // Check if this audio is currently playing
+        let is_playing = self.playing_url.as_ref() == Some(&url);
+
+        let title = audio_player
+            .title
+            .as_ref()
+            .map(|t| resolve_string_value_scoped(t, data_model, self.current_scope.as_deref()))
+            .unwrap_or_else(|| "Audio".to_string());
+
+        let artist = audio_player
+            .artist
+            .as_ref()
+            .map(|a| resolve_string_value_scoped(a, data_model, self.current_scope.as_deref()));
+
+        // Record start position
+        let start_pos = cx.turtle().pos();
+
+        // AudioPlayer card layout
+        let walk = Walk {
+            width: Size::fill(),
+            height: Size::fit(),
+            margin: Margin { top: 8.0, bottom: 8.0, left: 0.0, right: 0.0 },
+            ..Walk::default()
+        };
+        let layout = Layout {
+            flow: Flow::Down,
+            padding: Padding {
+                left: 16.0,
+                right: 16.0,
+                top: 12.0,
+                bottom: 12.0,
+            },
+            spacing: 8.0,
+            ..Layout::default()
+        };
+
+        // Draw card background
+        self.draw_card.begin(cx, walk, layout);
+        self.inside_card = true;
+
+        // Title row
+        let title_walk = Walk::fill_fit();
+        let title_layout = Layout {
+            flow: Flow::right(),
+            spacing: 8.0,
+            align: Align { x: 0.0, y: 0.5 },
+            ..Layout::default()
+        };
+        cx.begin_turtle(title_walk, title_layout);
+
+        // Music icon (🎵)
+        self.draw_card_text.text_style.font_size = 20.0;
+        self.draw_card_text.draw_walk(cx, Walk::fit(), Align::default(), "🎵");
+
+        // Title and artist column
+        let info_walk = Walk::fit();
+        let info_layout = Layout {
+            flow: Flow::Down,
+            spacing: 2.0,
+            ..Layout::default()
+        };
+        cx.begin_turtle(info_walk, info_layout);
+
+        // Title
+        self.draw_card_text.text_style.font_size = 16.0;
+        self.draw_card_text.draw_walk(cx, Walk::fit(), Align::default(), &title);
+
+        // Artist (if present)
+        if let Some(artist_name) = &artist {
+            self.draw_card_text.text_style.font_size = 12.0;
+            self.draw_card_text.color = vec4(0.6, 0.6, 0.6, 1.0);
+            self.draw_card_text.draw_walk(cx, Walk::fit(), Align::default(), artist_name);
+            self.draw_card_text.color = vec4(1.0, 1.0, 1.0, 1.0); // Reset color
+        }
+
+        cx.end_turtle();
+        cx.end_turtle();
+
+        // Play button
+        let button_walk = Walk::fit();
+        let button_layout = Layout {
+            padding: Padding {
+                left: 20.0,
+                right: 20.0,
+                top: 10.0,
+                bottom: 10.0,
+            },
+            align: Align { x: 0.5, y: 0.5 },
+            ..Layout::default()
+        };
+
+        // Button colors - different for play vs stop
+        let (base_color, hover_color, button_text) = if is_playing {
+            (
+                vec4(0.9, 0.3, 0.3, 1.0),    // Red for stop
+                vec4(0.8, 0.2, 0.2, 1.0),    // Darker red
+                "⏹ Stop"
+            )
+        } else {
+            (
+                vec4(0.231, 0.51, 0.965, 1.0),   // Blue for play
+                vec4(0.145, 0.388, 0.922, 1.0), // Darker blue
+                "▶ Play"
+            )
+        };
+        let color = if is_hovered { hover_color } else { base_color };
+
+        self.draw_button.color = color;
+        self.draw_button.begin(cx, button_walk, button_layout);
+
+        // Play/Stop button text
+        self.draw_button_text.text_style.font_size = 14.0;
+        self.draw_button_text.draw_walk(cx, Walk::fit(), Align::default(), button_text);
+
+        self.draw_button.end(cx);
+
+        // Use draw_button's area directly for hit testing
+        let button_area = self.draw_button.area();
+
+        // Update or create Area for this audio player button
+        if audio_player_idx < self.audio_player_areas.len() {
+            self.audio_player_areas[audio_player_idx] = button_area;
+        } else {
+            self.audio_player_areas.push(button_area);
+        }
+
+        self.inside_card = false;
+        self.draw_card.end(cx);
+
+        // Store metadata
+        self.audio_player_data.push((
+            component_id.to_string(),
+            url,
+            title,
+        ));
+    }
 }
 
 impl A2uiSurfaceRef {
@@ -2310,6 +2555,28 @@ impl A2uiSurfaceRef {
             }
         }
         None
+    }
+
+    /// Check if an audio play action was triggered
+    /// Returns (component_id, url, title) if PlayAudio was triggered
+    pub fn play_audio(&self, actions: &Actions) -> Option<(String, String, String)> {
+        if let Some(inner) = self.borrow() {
+            if let Some(action) = actions.find_widget_action(inner.widget_uid()) {
+                if let A2uiSurfaceAction::PlayAudio { component_id, url, title } =
+                    action.cast::<A2uiSurfaceAction>()
+                {
+                    return Some((component_id, url, title));
+                }
+            }
+        }
+        None
+    }
+
+    /// Set the currently playing audio URL (for Play/Stop toggle display)
+    pub fn set_playing_url(&self, url: Option<String>) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_playing_url(url);
+        }
     }
 }
 

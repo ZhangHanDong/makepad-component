@@ -1,0 +1,120 @@
+[
+  {
+    "beginRendering": {
+      "root": "main-column",
+      "surfaceId": "main"
+    }
+  },
+  {
+    "surfaceUpdate": {
+      "components": [
+        {
+          "component": {
+            "Text": {
+              "text": {
+                "literalString": "🎵 测试歌曲播放器"
+              },
+              "usageHint": "h1"
+            }
+          },
+          "id": "title"
+        },
+        {
+          "component": {
+            "AudioPlayer": {
+              "artist": {
+                "literalString": "SoundHelix"
+              },
+              "title": {
+                "literalString": "测试歌曲 2"
+              },
+              "url": {
+                "literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+              }
+            }
+          },
+          "id": "player2"
+        },
+        {
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "title",
+                  "card1",
+                  "card2",
+                  "card3"
+                ]
+              }
+            }
+          },
+          "id": "main-column"
+        },
+        {
+          "component": {
+            "AudioPlayer": {
+              "artist": {
+                "literalString": "SoundHelix"
+              },
+              "title": {
+                "literalString": "测试歌曲 1"
+              },
+              "url": {
+                "literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+              }
+            }
+          },
+          "id": "player1"
+        },
+        {
+          "component": {
+            "Card": {
+              "child": "player3"
+            }
+          },
+          "id": "card3"
+        },
+        {
+          "component": {
+            "AudioPlayer": {
+              "artist": {
+                "literalString": "SoundHelix"
+              },
+              "title": {
+                "literalString": "测试歌曲 3"
+              },
+              "url": {
+                "literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
+              }
+            }
+          },
+          "id": "player3"
+        },
+        {
+          "component": {
+            "Card": {
+              "child": "player2"
+            }
+          },
+          "id": "card2"
+        },
+        {
+          "component": {
+            "Card": {
+              "child": "player1"
+            }
+          },
+          "id": "card1"
+        }
+      ],
+      "surfaceId": "main"
+    }
+  },
+  {
+    "dataModelUpdate": {
+      "contents": [],
+      "path": "/",
+      "surfaceId": "main"
+    }
+  }
+]

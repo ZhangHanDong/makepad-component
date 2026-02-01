@@ -268,6 +268,10 @@ pub struct App {
 
     #[rust]
     current_theme: Theme,
+
+    /// Currently playing audio URL (None = not playing)
+    #[rust]
+    playing_audio_url: Option<String>,
 }
 
 impl LiveRegister for App {
@@ -478,6 +482,102 @@ impl App {
                                 &format!("🎯 Action: {}", user_action.action.name),
                             );
                         }
+                    }
+                    self.ui.redraw(cx);
+                }
+                A2uiSurfaceAction::PlayAudio { component_id: _, url, title } => {
+                    // Toggle: if same URL is playing, stop it
+                    if self.playing_audio_url.as_ref() == Some(&url) {
+                        // Stop playing
+                        #[cfg(target_os = "macos")]
+                        {
+                            let _ = std::process::Command::new("pkill")
+                                .args(["-9", "afplay"])
+                                .status();
+                        }
+                        self.playing_audio_url = None;
+
+                        // Update surface state for button display
+                        let surface = self.ui.a2ui_surface(ids!(a2ui_surface));
+                        surface.set_playing_url(None);
+
+                        self.ui.label(ids!(status_label)).set_text(
+                            cx,
+                            &format!("⏹ Stopped: {}", title),
+                        );
+                        log!("Stopped: {}", title);
+                    } else {
+                        // Stop any current playback first
+                        #[cfg(target_os = "macos")]
+                        {
+                            let _ = std::process::Command::new("pkill")
+                                .args(["-9", "afplay"])
+                                .status();
+                        }
+
+                        log!("PlayAudio: {} - {}", title, url);
+                        self.playing_audio_url = Some(url.clone());
+
+                        // Update surface state for button display
+                        let surface = self.ui.a2ui_surface(ids!(a2ui_surface));
+                        surface.set_playing_url(Some(url.clone()));
+
+                        self.ui.label(ids!(status_label)).set_text(
+                            cx,
+                            &format!("🎵 Playing: {}", title),
+                        );
+
+                        // Download to resources directory and play
+                        let title_clone = title.clone();
+                        let url_clone = url.clone();
+                        std::thread::spawn(move || {
+                            // Determine file extension from URL
+                            let ext = if url_clone.contains(".mp4") { "mp4" }
+                                else if url_clone.contains(".mp3") { "mp3" }
+                                else { "mp3" };
+
+                            let filename = format!("audio_{}.{}",
+                                title_clone.chars().filter(|c| c.is_alphanumeric()).collect::<String>(),
+                                ext
+                            );
+                            let download_path = format!("crates/a2ui-demo/resources/{}", filename);
+
+                            log!("Downloading {} to {}", url_clone, download_path);
+
+                            // Download using curl
+                            let status = std::process::Command::new("curl")
+                                .args(["-L", "-o", &download_path, &url_clone])
+                                .status();
+
+                            match status {
+                                Ok(s) if s.success() => {
+                                    log!("Download complete: {}", download_path);
+
+                                    // Play with system player
+                                    #[cfg(target_os = "macos")]
+                                    {
+                                        let _ = std::process::Command::new("afplay")
+                                            .arg(&download_path)
+                                            .spawn();
+                                    }
+                                    #[cfg(target_os = "linux")]
+                                    {
+                                        let _ = std::process::Command::new("aplay")
+                                            .arg(&download_path)
+                                            .spawn();
+                                    }
+                                    #[cfg(target_os = "windows")]
+                                    {
+                                        let _ = std::process::Command::new("cmd")
+                                            .args(["/C", "start", "", &download_path])
+                                            .spawn();
+                                    }
+                                }
+                                _ => {
+                                    log!("Download failed");
+                                }
+                            }
+                        });
                     }
                     self.ui.redraw(cx);
                 }

@@ -41,3 +41,4 @@ reqwest = { version = "0.11", features = ["json"], optional = true }
 default = []
 mock-server = ["tokio", "hyper", "hyper-util", "http-body-util"]
 kimi-bridge = ["tokio", "hyper", "hyper-util", "http-body-util", "reqwest"]
+mureka = ["kimi-bridge"]  # Mureka AI music generation (requires MUREKA_API_KEY)
