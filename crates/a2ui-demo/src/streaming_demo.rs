@@ -75,17 +75,22 @@ live_design! {
                         draw_text: { color: #888888 }
                     }
 
-                    // A2UI Surface
-                    <View> {
+                    // A2UI Surface with scroll
+                    <ScrollYView> {
                         width: Fill
                         height: Fill
                         show_bg: true
                         draw_bg: { color: #222244 }
-                        padding: 16.0
 
-                        a2ui_surface = <A2uiSurface> {
+                        <View> {
                             width: Fill
-                            height: Fill
+                            height: Fit
+                            padding: 16.0
+
+                            a2ui_surface = <A2uiSurface> {
+                                width: Fill
+                                height: Fit
+                            }
                         }
                     }
                 }
@@ -232,6 +237,26 @@ impl StreamingApp {
                     if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
                         if let Some(processor) = surface.processor_mut() {
                             if let Some(data_model) = processor.get_data_model_mut(&surface_id) {
+                                // Implement radio button behavior for payment methods
+                                // When one is selected, deselect all others
+                                let payment_methods = [
+                                    "/payment/creditCard",
+                                    "/payment/paypal",
+                                    "/payment/alipay",
+                                    "/payment/wechat",
+                                ];
+
+                                if payment_methods.contains(&path.as_str()) {
+                                    // If setting to true, deselect all others first
+                                    if value == serde_json::Value::Bool(true) {
+                                        for method in &payment_methods {
+                                            if *method != path {
+                                                data_model.set(method, serde_json::Value::Bool(false));
+                                            }
+                                        }
+                                    }
+                                }
+
                                 data_model.set(&path, value);
                             }
                         }

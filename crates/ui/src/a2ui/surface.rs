@@ -340,6 +340,8 @@ live_design! {
         img_headphones: dep("crate://self/resources/headphones.jpg")
         img_mouse: dep("crate://self/resources/mouse.jpg")
         img_keyboard: dep("crate://self/resources/keyboard.jpg")
+        img_alipay: dep("crate://self/resources/alipay.png")
+        img_wechat: dep("crate://self/resources/wechat.png")
     }
 
     // A2UI Text component
@@ -624,6 +626,10 @@ pub struct A2uiSurface {
     img_mouse: LiveDependency,
     #[live]
     img_keyboard: LiveDependency,
+    #[live]
+    img_alipay: LiveDependency,
+    #[live]
+    img_wechat: LiveDependency,
 
     /// Loaded textures for images
     #[rust]
@@ -632,6 +638,10 @@ pub struct A2uiSurface {
     texture_mouse: Option<Texture>,
     #[rust]
     texture_keyboard: Option<Texture>,
+    #[rust]
+    texture_alipay: Option<Texture>,
+    #[rust]
+    texture_wechat: Option<Texture>,
 
     /// Surface ID
     #[live]
@@ -787,9 +797,33 @@ impl A2uiSurface {
                 }
             }
         }
+
+        // Load Alipay icon (PNG)
+        if self.texture_alipay.is_none() {
+            let path = self.img_alipay.as_str();
+            if !path.is_empty() {
+                if let Ok(data) = cx.get_dependency(path) {
+                    if let Ok(image) = ImageBuffer::from_png(&data) {
+                        self.texture_alipay = Some(image.into_new_texture(cx));
+                    }
+                }
+            }
+        }
+
+        // Load WeChat icon (PNG)
+        if self.texture_wechat.is_none() {
+            let path = self.img_wechat.as_str();
+            if !path.is_empty() {
+                if let Ok(data) = cx.get_dependency(path) {
+                    if let Ok(image) = ImageBuffer::from_png(&data) {
+                        self.texture_wechat = Some(image.into_new_texture(cx));
+                    }
+                }
+            }
+        }
     }
 
-    /// Get texture index for a given URL (0=headphones, 1=mouse, 2=keyboard, None=not found)
+    /// Get texture index for a given URL (0=headphones, 1=mouse, 2=keyboard, 3=alipay, 4=wechat, None=not found)
     fn get_texture_index_for_url(&self, url: &str) -> Option<usize> {
         if url.contains("headphones") && self.texture_headphones.is_some() {
             Some(0)
@@ -797,6 +831,10 @@ impl A2uiSurface {
             Some(1)
         } else if url.contains("keyboard") && self.texture_keyboard.is_some() {
             Some(2)
+        } else if url.contains("alipay") && self.texture_alipay.is_some() {
+            Some(3)
+        } else if url.contains("wechat") && self.texture_wechat.is_some() {
+            Some(4)
         } else {
             None
         }
@@ -1027,6 +1065,11 @@ impl Widget for A2uiSurface {
                         cx.set_cursor(MouseCursor::Default);
                         needs_redraw = true;
                     }
+                }
+                Hit::FingerDown(_) => {
+                    // Must handle FingerDown to receive FingerUp
+                    self.hovered_checkbox_idx = Some(idx);
+                    needs_redraw = true;
                 }
                 Hit::FingerUp(fe) => {
                     if fe.is_over {
@@ -1496,6 +1539,7 @@ impl A2uiSurface {
         );
 
 
+
         // Determine font size based on usage hint
         let font_size = match text.usage_hint {
             Some(TextUsageHint::H1) => 28.0,
@@ -1555,6 +1599,8 @@ impl A2uiSurface {
                 0 => self.texture_headphones.as_ref(),
                 1 => self.texture_mouse.as_ref(),
                 2 => self.texture_keyboard.as_ref(),
+                3 => self.texture_alipay.as_ref(),
+                4 => self.texture_wechat.as_ref(),
                 _ => None,
             };
 
@@ -1899,13 +1945,15 @@ impl A2uiSurface {
             }
         }
 
+        // Get the used rect before ending turtle
+        let used = cx.turtle().used();
         cx.end_turtle();
 
-        // Calculate rect for hit testing
-        let end_pos = cx.turtle().pos();
+        // Calculate rect for hit testing using the actual used space
+        // Ensure minimum clickable area: 200px wide, 28px high
         let rect = Rect {
             pos: start_pos,
-            size: dvec2(end_pos.x - start_pos.x, 20.0),
+            size: dvec2(used.x.max(200.0), used.y.max(28.0)),
         };
 
         // Update or create area
