@@ -226,7 +226,8 @@ impl App {
             self.host = None;
         }
 
-        // Clear the surface before connecting
+        // Clear surface BEFORE connecting - this ensures a fresh start
+        // The BeginRendering message will create a new surface
         let surface_ref = self.ui.widget(ids!(a2ui_surface));
         if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
             surface.clear();
@@ -279,9 +280,15 @@ impl App {
                     self.ui.label(ids!(status_label)).set_text(cx, "✅ Connected! Receiving UI...");
                 }
                 A2uiHostEvent::Message(msg) => {
+                    log!("Received A2uiMessage: {:?}", msg);
                     if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
                         let events = surface.process_message(msg);
                         log!("Processed streaming message, {} events", events.len());
+                        for event in &events {
+                            log!("  Event: {:?}", event);
+                        }
+                    } else {
+                        log!("ERROR: Could not borrow A2uiSurface!");
                     }
                     self.ui.label(ids!(status_label)).set_text(cx, "📥 Receiving UI updates...");
                 }

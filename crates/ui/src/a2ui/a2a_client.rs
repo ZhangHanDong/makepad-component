@@ -246,9 +246,17 @@ impl A2aEventStream {
             ResultValue::Event(event) => {
                 // Check for A2UI messages in data
                 if let Some(data) = event.data {
+                    eprintln!("[A2A] Event data: {}", serde_json::to_string_pretty(&data).unwrap_or_default());
+
                     // Try to parse as A2UI message
-                    if let Ok(msg) = serde_json::from_value::<A2uiMessage>(data.clone()) {
-                        return Some(A2aStreamEvent::A2uiMessage(msg));
+                    match serde_json::from_value::<A2uiMessage>(data.clone()) {
+                        Ok(msg) => {
+                            eprintln!("[A2A] Parsed A2uiMessage directly: {:?}", msg);
+                            return Some(A2aStreamEvent::A2uiMessage(msg));
+                        }
+                        Err(e) => {
+                            eprintln!("[A2A] Direct A2uiMessage parse failed: {}", e);
+                        }
                     }
 
                     // Check for nested A2UI message keys
@@ -260,8 +268,10 @@ impl A2aEventStream {
                             "deleteSurface",
                         ] {
                             if obj.contains_key(key) {
+                                eprintln!("[A2A] Found A2UI key: {}", key);
                                 if let Ok(msg) = serde_json::from_value::<A2uiMessage>(data.clone())
                                 {
+                                    eprintln!("[A2A] Parsed A2uiMessage from key {}: {:?}", key, msg);
                                     return Some(A2aStreamEvent::A2uiMessage(msg));
                                 }
                             }

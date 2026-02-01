@@ -1152,16 +1152,25 @@ impl Widget for A2uiSurface {
         // Get surface and data model - clone to avoid borrow issues
         let surface_id = self.get_surface_id();
         let render_data = if let Some(processor) = &self.processor {
-            if let Some(surface) = processor.get_surface(&surface_id) {
-                if let Some(data_model) = processor.get_data_model(&surface_id) {
-                    Some((surface.clone(), data_model.clone()))
-                } else {
-                    None
-                }
+            let surface_opt = processor.get_surface(&surface_id);
+            let data_model_opt = processor.get_data_model(&surface_id);
+
+            // Debug: Log what we found
+            if surface_opt.is_none() {
+                log!("[draw_walk] No surface found for id: {}", surface_id);
+            }
+            if data_model_opt.is_none() {
+                log!("[draw_walk] No data model found for id: {}", surface_id);
+            }
+
+            if let (Some(surface), Some(data_model)) = (surface_opt, data_model_opt) {
+                log!("[draw_walk] Found surface with root: {}, {} components", surface.root, surface.components.len());
+                Some((surface.clone(), data_model.clone()))
             } else {
                 None
             }
         } else {
+            log!("[draw_walk] No processor!");
             None
         };
 
