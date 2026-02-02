@@ -473,6 +473,56 @@ impl A2uiBuilder {
 
     fn build_a2ui_json(&self) -> Value {
         let root = self.root_id.as_deref().unwrap_or("root");
+        let mut components = self.components.clone();
+
+        // Check if root component exists; if not, auto-create it as a Column
+        // containing all top-level components (those not referenced as children)
+        let root_exists = components.iter().any(|c| {
+            c["id"].as_str() == Some(root)
+        });
+
+        if !root_exists {
+            // Collect all IDs that are referenced as children by other components
+            let mut child_ids = std::collections::HashSet::new();
+            for comp in &components {
+                let c = &comp["component"];
+                // Column children
+                if let Some(kids) = c["Column"]["children"]["explicitList"].as_array() {
+                    for kid in kids {
+                        if let Some(id) = kid.as_str() { child_ids.insert(id.to_string()); }
+                    }
+                }
+                // Row children
+                if let Some(kids) = c["Row"]["children"]["explicitList"].as_array() {
+                    for kid in kids {
+                        if let Some(id) = kid.as_str() { child_ids.insert(id.to_string()); }
+                    }
+                }
+                // Card child
+                if let Some(id) = c["Card"]["child"].as_str() { child_ids.insert(id.to_string()); }
+                // Button child
+                if let Some(id) = c["Button"]["child"].as_str() { child_ids.insert(id.to_string()); }
+            }
+
+            // Top-level = components whose IDs are not referenced as children
+            let top_level: Vec<String> = components.iter()
+                .filter_map(|c| {
+                    let id = c["id"].as_str()?;
+                    if !child_ids.contains(id) { Some(id.to_string()) } else { None }
+                })
+                .collect();
+
+            eprintln!("[A2uiBuilder] Root '{}' not found, auto-creating Column with {} top-level children", root, top_level.len());
+
+            components.push(json!({
+                "id": root,
+                "component": {
+                    "Column": {
+                        "children": { "explicitList": top_level }
+                    }
+                }
+            }));
+        }
 
         json!([
             {
@@ -484,7 +534,7 @@ impl A2uiBuilder {
             {
                 "surfaceUpdate": {
                     "surfaceId": "main",
-                    "components": self.components
+                    "components": components
                 }
             },
             {
