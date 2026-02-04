@@ -181,6 +181,40 @@ fn get_a2ui_tools() -> Value {
         {
             "type": "function",
             "function": {
+                "name": "create_chart",
+                "description": "Create a chart. Types: bar, line, pie, area (filled line), scatter (series[0]=X,series[1]=Y), radar (labels=axes, values per axis), gauge (series[0].values[0]=value, maxValue=max), bubble (series[0]=X,[1]=Y,[2]=Size), candlestick (4 series: open,high,low,close), heatmap (series=rows, labels=columns), treemap (series[0]=sizes), chord (labels=entities, series=flow matrix rows: series[i].values[j]=flow from i to j), sankey (labels=node names, series[0]=source indices, series[1]=target indices, series[2]=flow values).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string", "description": "Unique component ID"},
+                        "chartType": {"type": "string", "enum": ["bar", "line", "pie", "area", "scatter", "radar", "gauge", "bubble", "candlestick", "heatmap", "treemap", "chord", "sankey"], "description": "Chart type"},
+                        "title": {"type": "string", "description": "Chart title displayed above the chart"},
+                        "labels": {"type": "array", "items": {"type": "string"}, "description": "Category labels / axis names / column headers"},
+                        "values": {"type": "array", "items": {"type": "number"}, "description": "Data values for a single series"},
+                        "series": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string", "description": "Series name (for legend)"},
+                                    "values": {"type": "array", "items": {"type": "number"}, "description": "Data values"}
+                                },
+                                "required": ["values"]
+                            },
+                            "description": "Multiple data series (alternative to 'values' for multi-series charts)"
+                        },
+                        "colors": {"type": "array", "items": {"type": "string"}, "description": "Color palette as hex strings"},
+                        "width": {"type": "number", "description": "Chart width in pixels (default: 400)"},
+                        "height": {"type": "number", "description": "Chart height in pixels (default: 300)"},
+                        "maxValue": {"type": "number", "description": "Max value for gauge chart (default: 100)"}
+                    },
+                    "required": ["id", "chartType", "labels"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "render_ui",
                 "description": "Finalize and render the UI with the specified root component. Call this LAST after creating all components.",
                 "parameters": {
@@ -258,6 +292,7 @@ impl A2uiBuilder {
             "create_card" => self.create_card(args),
             "create_column" => self.create_column(args),
             "create_row" => self.create_row(args),
+            "create_chart" => self.create_chart(args),
             "set_data" => self.set_data(args),
             "render_ui" => self.render_ui(args),
             _ => eprintln!("Unknown tool: {}", name),
@@ -421,6 +456,74 @@ impl A2uiBuilder {
                     "children": {"explicitList": children}
                 }
             }
+        }));
+    }
+
+    fn create_chart(&mut self, args: &Value) {
+        let id = args["id"].as_str().unwrap_or("chart");
+        let chart_type = args["chartType"].as_str().unwrap_or("bar");
+        let title = args["title"].as_str();
+        let width = args["width"].as_f64().unwrap_or(400.0);
+        let height = args["height"].as_f64().unwrap_or(300.0);
+
+        // Parse labels
+        let labels: Vec<String> = args["labels"]
+            .as_array()
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+
+        // Parse series - either from "series" array or single "values" array
+        let series: Vec<Value> = if let Some(series_arr) = args["series"].as_array() {
+            series_arr.iter().map(|s| {
+                let name = s["name"].as_str().map(|n| json!(n));
+                let values: Vec<f64> = s["values"]
+                    .as_array()
+                    .map(|arr| arr.iter().filter_map(|v| v.as_f64()).collect())
+                    .unwrap_or_default();
+                let mut obj = json!({"values": values});
+                if let Some(n) = name {
+                    obj["name"] = n;
+                }
+                obj
+            }).collect()
+        } else if let Some(values_arr) = args["values"].as_array() {
+            let values: Vec<f64> = values_arr.iter().filter_map(|v| v.as_f64()).collect();
+            vec![json!({"values": values})]
+        } else {
+            vec![json!({"values": []})]
+        };
+
+        // Parse colors
+        let colors: Vec<String> = args["colors"]
+            .as_array()
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+
+        let mut component = json!({
+            "Chart": {
+                "chartType": chart_type,
+                "labels": labels,
+                "series": series,
+                "width": width,
+                "height": height
+            }
+        });
+
+        if let Some(t) = title {
+            component["Chart"]["title"] = json!({"literalString": t});
+        }
+
+        if !colors.is_empty() {
+            component["Chart"]["colors"] = json!(colors);
+        }
+
+        if let Some(max_val) = args["maxValue"].as_f64() {
+            component["Chart"]["maxValue"] = json!(max_val);
+        }
+
+        self.components.push(json!({
+            "id": id,
+            "component": component
         }));
     }
 

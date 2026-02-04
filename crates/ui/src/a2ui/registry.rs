@@ -29,6 +29,9 @@ pub enum A2uiComponentType {
     // Container
     Modal,
     Tabs,
+
+    // Visualization
+    Chart,
 }
 
 impl A2uiComponentType {
@@ -50,6 +53,7 @@ impl A2uiComponentType {
             A2uiComponentType::MultipleChoice => "MultipleChoice",
             A2uiComponentType::Modal => "Modal",
             A2uiComponentType::Tabs => "Tabs",
+            A2uiComponentType::Chart => "Chart",
         }
     }
 
@@ -71,6 +75,7 @@ impl A2uiComponentType {
             "MultipleChoice" => Some(A2uiComponentType::MultipleChoice),
             "Modal" => Some(A2uiComponentType::Modal),
             "Tabs" => Some(A2uiComponentType::Tabs),
+            "Chart" => Some(A2uiComponentType::Chart),
             _ => None,
         }
     }
@@ -93,6 +98,7 @@ impl A2uiComponentType {
             A2uiComponentType::MultipleChoice,
             A2uiComponentType::Modal,
             A2uiComponentType::Tabs,
+            A2uiComponentType::Chart,
         ]
     }
 }
@@ -260,6 +266,14 @@ impl ComponentRegistry {
             implemented: true,
         });
 
+        // Visualization components
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Chart,
+            makepad_widget: "A2uiChart",
+            description: "Chart visualization (bar, line, pie)",
+            implemented: true,
+        });
+
         registry
     }
 
@@ -331,6 +345,7 @@ pub fn component_type_of(component: &super::message::ComponentType) -> A2uiCompo
         ComponentType::MultipleChoice(_) => A2uiComponentType::MultipleChoice,
         ComponentType::Modal(_) => A2uiComponentType::Modal,
         ComponentType::Tabs(_) => A2uiComponentType::Tabs,
+        ComponentType::Chart(_) => A2uiComponentType::Chart,
     }
 }
 

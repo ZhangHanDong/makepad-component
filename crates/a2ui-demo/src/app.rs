@@ -277,7 +277,7 @@ impl App {
         self.ui.label(ids!(title_label)).set_text(cx, "🎨 Live A2UI Editor");
 
         let config = A2uiHostConfig {
-            url: "http://localhost:8081/rpc".to_string(),
+            url: "http://localhost:8082/rpc".to_string(),
             auth_token: None,
         };
 
@@ -303,7 +303,7 @@ impl App {
     fn reconnect_live(&mut self, cx: &mut Cx) {
         // Reconnect to get updates (don't clear surface - we want incremental updates)
         let config = A2uiHostConfig {
-            url: "http://localhost:8081/rpc".to_string(),
+            url: "http://localhost:8082/rpc".to_string(),
             auth_token: None,
         };
 

@@ -161,6 +161,9 @@ pub enum ComponentType {
     // Container components
     Modal(ModalComponent),
     Tabs(TabsComponent),
+
+    // Visualization components
+    Chart(ChartComponent),
 }
 
 /// Children reference - either explicit list or template-based
@@ -438,6 +441,87 @@ pub struct TabDefinition {
     pub label: StringValue,
     /// Content component ID
     pub content: String,
+}
+
+// ============================================================================
+// Visualization Components
+// ============================================================================
+
+/// Chart visualization component (bar, line, pie, etc.)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChartComponent {
+    /// Chart type
+    pub chart_type: ChartType,
+
+    /// Chart title (optional)
+    #[serde(default)]
+    pub title: Option<StringValue>,
+
+    /// Category labels (X-axis for bar/line, slice labels for pie)
+    pub labels: Vec<String>,
+
+    /// Data series - each series has a name and values
+    pub series: Vec<ChartSeries>,
+
+    /// Chart width in logical pixels
+    #[serde(default = "default_chart_width")]
+    pub width: f64,
+
+    /// Chart height in logical pixels
+    #[serde(default = "default_chart_height")]
+    pub height: f64,
+
+    /// Color palette (hex strings, optional - defaults to built-in palette)
+    #[serde(default)]
+    pub colors: Vec<String>,
+
+    /// Whether to show legend
+    #[serde(default)]
+    pub show_legend: Option<bool>,
+
+    /// Max value (used by gauge chart as dial maximum, default 100)
+    #[serde(default)]
+    pub max_value: Option<f64>,
+}
+
+fn default_chart_width() -> f64 {
+    400.0
+}
+
+fn default_chart_height() -> f64 {
+    300.0
+}
+
+/// A data series for charts
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChartSeries {
+    /// Series name (for legend)
+    #[serde(default)]
+    pub name: Option<String>,
+
+    /// Data values
+    pub values: Vec<f64>,
+}
+
+/// Supported chart types
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ChartType {
+    Bar,
+    Line,
+    Pie,
+    Area,
+    Scatter,
+    Radar,
+    Gauge,
+    Bubble,
+    Candlestick,
+    Heatmap,
+    Treemap,
+    Chord,
+    Sankey,
 }
 
 // ============================================================================

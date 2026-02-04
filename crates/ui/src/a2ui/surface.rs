@@ -179,6 +179,183 @@ live_design! {
         }
     }
 
+    // ============================================================================
+    // A2UI Chart Drawing Primitives (adapted from makepad-d3)
+    // ============================================================================
+
+    // Bar chart bar shader
+    DrawA2uiBar = {{DrawA2uiBar}} {
+        fn pixel(self) -> vec4 {
+            let uv = self.pos;
+            // Simple solid color bar with slight gradient
+            let t = 1.0 - uv.y * 0.3; // subtle top-to-bottom darkening
+            return vec4(self.color.rgb * t * self.color.a, self.color.a);
+        }
+    }
+
+    // Line chart segment shader
+    DrawA2uiChartLine = {{DrawA2uiChartLine}} {
+        fn pixel(self) -> vec4 {
+            let uv = self.pos;
+
+            // Line endpoints in normalized coordinates (0-1)
+            let p1 = vec2(self.x1, self.y1);
+            let p2 = vec2(self.x2, self.y2);
+            let p = uv;
+
+            // Vector from p1 to p2
+            let line_vec = p2 - p1;
+            let line_len = length(line_vec);
+
+            if line_len < 0.001 {
+                return vec4(0.0, 0.0, 0.0, 0.0);
+            }
+
+            // Project point onto line
+            let t = clamp(dot(p - p1, line_vec) / (line_len * line_len), 0.0, 1.0);
+            let closest = p1 + t * line_vec;
+
+            // Distance from point to line
+            let dist = length(p - closest);
+
+            // Line width in normalized coordinates
+            let half_width = self.line_width * 0.5;
+
+            // Anti-aliased edge
+            let aa = 0.02;
+            let alpha = 1.0 - smoothstep(half_width - aa, half_width + aa, dist);
+
+            if alpha < 0.01 {
+                return vec4(0.0, 0.0, 0.0, 0.0);
+            }
+
+            return vec4(self.color.rgb * self.color.a * alpha, self.color.a * alpha);
+        }
+    }
+
+    // Pie/donut chart arc shader
+    DrawA2uiArc = {{DrawA2uiArc}} {
+        fn pixel(self) -> vec4 {
+            let pi_val = 3.14159265;
+            let two_pi_val = 6.28318530;
+
+            // Center of the quad is at (0.5, 0.5)
+            let px = self.pos.x - 0.5;
+            let py = self.pos.y - 0.5;
+
+            // Distance from center
+            let distance = sqrt(px * px + py * py);
+
+            // Radii in normalized space
+            let inner_rad = self.inner_radius * 0.5;
+            let outer_rad = 0.5;
+
+            // Distance mask
+            let dist_mask = step(inner_rad, distance) * step(distance, outer_rad);
+
+            // Angle using atan2
+            let pixel_ang = atan(py, px);
+
+            // Angle calculation
+            let sweep_val = self.end_angle - self.start_angle;
+            let rel_ang = pixel_ang - self.start_angle;
+            let norm_ang = rel_ang + two_pi_val * 4.0;
+            let wrap_ang = mod(norm_ang, two_pi_val);
+
+            // Angle mask
+            let ang_mask = step(wrap_ang, sweep_val) * step(0.001, sweep_val);
+
+            // Combined mask
+            let final_mask = dist_mask * ang_mask;
+
+            // Anti-aliased edges
+            let edge_aa = 0.008;
+            let outer_aa = 1.0 - smoothstep(outer_rad - edge_aa, outer_rad + edge_aa, distance);
+            let inner_aa = smoothstep(inner_rad - edge_aa, inner_rad + edge_aa, distance);
+            let aa_alpha = outer_aa * inner_aa;
+
+            let alpha_val = final_mask * aa_alpha;
+
+            return vec4(self.color.rgb * alpha_val, self.color.a * alpha_val);
+        }
+    }
+
+    // Chart axis line shader (reuses line shader pattern but simpler)
+    DrawA2uiAxisLine = {{DrawA2uiAxisLine}} {
+        fn pixel(self) -> vec4 {
+            return vec4(self.color.rgb * self.color.a, self.color.a);
+        }
+    }
+
+    // Area fill shader (semi-transparent region with vertical gradient)
+    DrawA2uiTriangle = {{DrawA2uiTriangle}} {
+        fn pixel(self) -> vec4 {
+            let uv = self.pos;
+            // Fade from full opacity at bottom to reduced opacity at top
+            let alpha = mix(self.opacity, self.opacity * 0.3, 1.0 - uv.y);
+            return vec4(self.color.rgb * self.color.a * alpha, self.color.a * alpha);
+        }
+    }
+
+    // Anti-aliased circle point shader (for scatter/bubble)
+    DrawA2uiPoint = {{DrawA2uiPoint}} {
+        fn pixel(self) -> vec4 {
+            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+            let r = min(self.rect_size.x, self.rect_size.y) * 0.5;
+            let center = self.rect_size * 0.5;
+            sdf.circle(center.x, center.y, r - 1.0);
+            sdf.fill_keep(self.color);
+            if self.border_width > 0.5 {
+                sdf.stroke(self.border_color, self.border_width);
+            }
+            return sdf.result;
+        }
+    }
+
+    // Arbitrary convex quadrilateral shader (for chord ribbons, sankey bands)
+    // Renders pixels inside the quad. AA only on edges 0,2 (boundary);
+    // edges 1,3 (crossbars shared between adjacent quads) use hard clip.
+    DrawA2uiQuad = {{DrawA2uiQuad}} {
+        fn pixel(self) -> vec4 {
+            let p = self.pos * self.rect_size;
+
+            let p0 = vec2(self.p0x, self.p0y);
+            let p1 = vec2(self.p1x, self.p1y);
+            let p2 = vec2(self.p2x, self.p2y);
+            let p3 = vec2(self.p3x, self.p3y);
+
+            let e0 = p1 - p0; let v0 = p - p0;
+            let e1 = p2 - p1; let v1 = p - p1;
+            let e2 = p3 - p2; let v2 = p - p2;
+            let e3 = p0 - p3; let v3 = p - p3;
+
+            let c0 = e0.x * v0.y - e0.y * v0.x;
+            let c1 = e1.x * v1.y - e1.y * v1.x;
+            let c2 = e2.x * v2.y - e2.y * v2.x;
+            let c3 = e3.x * v3.y - e3.y * v3.x;
+
+            let all_pos = step(0.0, c0) * step(0.0, c1) * step(0.0, c2) * step(0.0, c3);
+            let all_neg = step(c0, 0.0) * step(c1, 0.0) * step(c2, 0.0) * step(c3, 0.0);
+            let inside = min(all_pos + all_neg, 1.0);
+
+            if inside < 0.5 {
+                return vec4(0.0, 0.0, 0.0, 0.0);
+            }
+
+            // AA only on boundary edges (0: top curve, 2: bottom curve)
+            // Crossbar edges (1, 3) get hard clip — no AA to prevent seams
+            let len0 = max(length(e0), 0.001);
+            let len2 = max(length(e2), 0.001);
+            let d0 = abs(c0) / len0;
+            let d2 = abs(c2) / len2;
+            let min_dist = min(d0, d2);
+            let aa = smoothstep(0.0, 1.5, min_dist);
+
+            let alpha = aa * self.opacity;
+            return vec4(self.color.rgb * self.color.a * alpha, self.color.a * alpha);
+        }
+    }
+
     // A2UI Surface - Root container for A2UI component rendering
     pub A2uiSurface = {{A2uiSurface}} {
         width: Fill
@@ -335,6 +512,25 @@ live_design! {
         draw_slider_thumb: <DrawA2uiSliderThumb> {
             thumb_color: #FFFFFF
         }
+
+        // Chart drawing
+        draw_chart_bar: <DrawA2uiBar> {}
+        draw_chart_line: <DrawA2uiChartLine> {}
+        draw_chart_arc: <DrawA2uiArc> {}
+        draw_chart_axis: <DrawA2uiAxisLine> {
+            color: #556688
+        }
+        draw_chart_text: {
+            text_style: <THEME_FONT_REGULAR> {
+                font_size: 10.0
+            }
+            color: #AABBCC
+        }
+        draw_chart_triangle: <DrawA2uiTriangle> {}
+        draw_chart_point: <DrawA2uiPoint> {
+            border_width: 0.0
+        }
+        draw_chart_quad: <DrawA2uiQuad> {}
 
         // Image resources
         img_headphones: dep("crate://self/resources/headphones.jpg")
@@ -535,6 +731,138 @@ pub struct DrawA2uiSliderThumb {
 }
 
 // ============================================================================
+// DrawA2uiBar - for rendering bar chart bars
+// ============================================================================
+
+#[derive(Live, LiveHook, LiveRegister)]
+#[repr(C)]
+pub struct DrawA2uiBar {
+    #[deref]
+    draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+}
+
+// ============================================================================
+// DrawA2uiChartLine - for rendering line chart segments
+// ============================================================================
+
+#[derive(Live, LiveHook, LiveRegister)]
+#[repr(C)]
+pub struct DrawA2uiChartLine {
+    #[deref]
+    draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live(0.0)]
+    pub x1: f32,
+    #[live(0.0)]
+    pub y1: f32,
+    #[live(1.0)]
+    pub x2: f32,
+    #[live(1.0)]
+    pub y2: f32,
+    #[live(0.05)]
+    pub line_width: f32,
+}
+
+// ============================================================================
+// DrawA2uiArc - for rendering pie chart slices
+// ============================================================================
+
+#[derive(Live, LiveHook, LiveRegister)]
+#[repr(C)]
+pub struct DrawA2uiArc {
+    #[deref]
+    draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live(0.0)]
+    pub start_angle: f32,
+    #[live(1.0)]
+    pub end_angle: f32,
+    #[live(0.0)]
+    pub inner_radius: f32,
+}
+
+// ============================================================================
+// DrawA2uiAxisLine - for rendering chart axes
+// ============================================================================
+
+#[derive(Live, LiveHook, LiveRegister)]
+#[repr(C)]
+pub struct DrawA2uiAxisLine {
+    #[deref]
+    draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+}
+
+// ============================================================================
+// DrawA2uiTriangle - for rendering area fills and polygon regions
+// ============================================================================
+
+#[derive(Live, LiveHook, LiveRegister)]
+#[repr(C)]
+pub struct DrawA2uiTriangle {
+    #[deref]
+    draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live(0.3)]
+    pub opacity: f32,
+}
+
+// ============================================================================
+// DrawA2uiPoint - for rendering scatter/bubble data points (circles)
+// ============================================================================
+
+#[derive(Live, LiveHook, LiveRegister)]
+#[repr(C)]
+pub struct DrawA2uiPoint {
+    #[deref]
+    draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live(0.0)]
+    pub border_width: f32,
+    #[live]
+    pub border_color: Vec4,
+}
+
+// ============================================================================
+// DrawA2uiQuad - arbitrary convex quadrilateral with AA edges
+// ============================================================================
+
+#[derive(Live, LiveHook, LiveRegister)]
+#[repr(C)]
+pub struct DrawA2uiQuad {
+    #[deref]
+    draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live(0.3)]
+    pub opacity: f32,
+    // Corner positions in pixel coords relative to the draw quad origin
+    #[live(0.0)]
+    pub p0x: f32,
+    #[live(0.0)]
+    pub p0y: f32,
+    #[live(1.0)]
+    pub p1x: f32,
+    #[live(0.0)]
+    pub p1y: f32,
+    #[live(1.0)]
+    pub p2x: f32,
+    #[live(1.0)]
+    pub p2y: f32,
+    #[live(0.0)]
+    pub p3x: f32,
+    #[live(1.0)]
+    pub p3y: f32,
+}
+
+// ============================================================================
 // A2UI Surface Widget
 // ============================================================================
 
@@ -618,6 +946,45 @@ pub struct A2uiSurface {
     #[redraw]
     #[live]
     draw_slider_thumb: DrawA2uiSliderThumb,
+
+    /// Draw chart bar
+    #[redraw]
+    #[live]
+    draw_chart_bar: DrawA2uiBar,
+
+    /// Draw chart line segment
+    #[redraw]
+    #[live]
+    draw_chart_line: DrawA2uiChartLine,
+
+    /// Draw chart arc (pie)
+    #[redraw]
+    #[live]
+    draw_chart_arc: DrawA2uiArc,
+
+    /// Draw chart axis lines
+    #[redraw]
+    #[live]
+    draw_chart_axis: DrawA2uiAxisLine,
+
+    /// Draw chart text (axis labels, legends)
+    #[live]
+    draw_chart_text: DrawText,
+
+    /// Draw chart filled area region
+    #[redraw]
+    #[live]
+    draw_chart_triangle: DrawA2uiTriangle,
+
+    /// Draw chart data point (circle)
+    #[redraw]
+    #[live]
+    draw_chart_point: DrawA2uiPoint,
+
+    /// Draw chart arbitrary quadrilateral (chord ribbons, sankey bands)
+    #[redraw]
+    #[live]
+    draw_chart_quad: DrawA2uiQuad,
 
     /// Image sources (preloaded)
     #[live]
@@ -1300,6 +1667,9 @@ impl A2uiSurface {
             }
             ComponentType::List(list) => {
                 self.render_list(cx, scope, surface, data_model, list);
+            }
+            ComponentType::Chart(chart) => {
+                self.render_chart(cx, chart, data_model);
             }
             _ => {
                 // Unsupported component - skip for now
@@ -2099,6 +2469,2109 @@ impl A2uiSurface {
         // Render children (supports template binding)
         let children = list.children.clone();
         self.render_children(cx, scope, surface, data_model, &children);
+
+        cx.end_turtle();
+    }
+
+    // ============================================================================
+    // Chart Rendering
+    // ============================================================================
+
+    /// Default color palette for charts
+    fn chart_palette(index: usize) -> Vec4 {
+        const COLORS: &[(f32, f32, f32)] = &[
+            (0.231, 0.510, 0.965),  // #3B82F6 blue
+            (0.161, 0.714, 0.467),  // #28B677 green
+            (0.937, 0.333, 0.314),  // #EF5550 red
+            (0.969, 0.643, 0.176),  // #F7A42D orange
+            (0.545, 0.361, 0.886),  // #8B5CE2 purple
+            (0.071, 0.741, 0.812),  // #12BDD0 teal
+            (0.957, 0.486, 0.667),  // #F47CAA pink
+            (0.400, 0.553, 0.200),  // #668D33 olive
+        ];
+        let (r, g, b) = COLORS[index % COLORS.len()];
+        Vec4 { x: r, y: g, z: b, w: 1.0 }
+    }
+
+    /// Parse a hex color string to Vec4
+    fn parse_hex_color(hex: &str) -> Option<Vec4> {
+        let hex = hex.trim_start_matches('#');
+        if hex.len() != 6 { return None; }
+        let r = u8::from_str_radix(&hex[0..2], 16).ok()? as f32 / 255.0;
+        let g = u8::from_str_radix(&hex[2..4], 16).ok()? as f32 / 255.0;
+        let b = u8::from_str_radix(&hex[4..6], 16).ok()? as f32 / 255.0;
+        Some(Vec4 { x: r, y: g, z: b, w: 1.0 })
+    }
+
+    fn get_chart_color(&self, chart: &ChartComponent, index: usize) -> Vec4 {
+        if index < chart.colors.len() {
+            if let Some(color) = Self::parse_hex_color(&chart.colors[index]) {
+                return color;
+            }
+        }
+        Self::chart_palette(index)
+    }
+
+    fn render_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        match chart.chart_type {
+            ChartType::Bar => self.render_bar_chart(cx, chart, data_model),
+            ChartType::Line => self.render_line_chart(cx, chart, data_model),
+            ChartType::Pie => self.render_pie_chart(cx, chart, data_model),
+            ChartType::Area => self.render_area_chart(cx, chart, data_model),
+            ChartType::Scatter => self.render_scatter_chart(cx, chart, data_model),
+            ChartType::Radar => self.render_radar_chart(cx, chart, data_model),
+            ChartType::Gauge => self.render_gauge_chart(cx, chart, data_model),
+            ChartType::Bubble => self.render_bubble_chart(cx, chart, data_model),
+            ChartType::Candlestick => self.render_candlestick_chart(cx, chart, data_model),
+            ChartType::Heatmap => self.render_heatmap_chart(cx, chart, data_model),
+            ChartType::Treemap => self.render_treemap_chart(cx, chart, data_model),
+            ChartType::Chord => self.render_chord_chart(cx, chart, data_model),
+            ChartType::Sankey => self.render_sankey_chart(cx, chart, data_model),
+        }
+    }
+
+    fn render_bar_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+        let padding_left = 50.0;
+        let padding_bottom = 30.0;
+        let padding_top = 30.0;
+        let padding_right = 20.0;
+
+        let plot_width = chart_width - padding_left - padding_right;
+        let plot_height = chart_height - padding_top - padding_bottom;
+
+        // Container
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        let layout = Layout::default();
+        cx.begin_turtle(walk, layout);
+        let origin = cx.turtle().pos();
+
+        // Title
+        if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                let title_walk = Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                };
+                self.draw_chart_text.draw_walk(cx, title_walk, Align::default(), &title);
+            }
+        }
+
+        // Find data range
+        let mut max_val: f64 = 0.0;
+        for series in &chart.series {
+            for &v in &series.values {
+                if v > max_val { max_val = v; }
+            }
+        }
+        if max_val == 0.0 { max_val = 1.0; }
+        // Nice rounding
+        let nice_max = Self::nice_number(max_val);
+
+        let label_count = chart.labels.len();
+        let series_count = chart.series.len().max(1);
+
+        if label_count == 0 {
+            cx.end_turtle();
+            return;
+        }
+
+        let group_width = plot_width / label_count as f64;
+        let bar_spacing = 2.0;
+        let bar_width = (group_width - bar_spacing * (series_count as f64 + 1.0)) / series_count as f64;
+        let bar_width = bar_width.max(4.0).min(60.0);
+
+        // Draw Y-axis line
+        self.draw_chart_axis.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top)),
+            width: Size::Fixed(1.0),
+            height: Size::Fixed(plot_height),
+            ..Walk::default()
+        });
+
+        // Draw X-axis line
+        self.draw_chart_axis.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top + plot_height)),
+            width: Size::Fixed(plot_width),
+            height: Size::Fixed(1.0),
+            ..Walk::default()
+        });
+
+        // Y-axis labels (5 ticks)
+        let tick_count = 5;
+        self.draw_chart_text.text_style.font_size = 9.0;
+        for i in 0..=tick_count {
+            let val = nice_max * i as f64 / tick_count as f64;
+            let y = origin.y + padding_top + plot_height - (plot_height * val / nice_max);
+            let label = if val >= 1000.0 {
+                format!("{:.0}k", val / 1000.0)
+            } else if val == val.floor() {
+                format!("{:.0}", val)
+            } else {
+                format!("{:.1}", val)
+            };
+            let label_walk = Walk {
+                abs_pos: Some(dvec2(origin.x + 4.0, y - 5.0)),
+                ..Walk::fit()
+            };
+            self.draw_chart_text.draw_walk(cx, label_walk, Align::default(), &label);
+
+            // Grid line
+            if i > 0 {
+                self.draw_chart_axis.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(origin.x + padding_left, y)),
+                    width: Size::Fixed(plot_width),
+                    height: Size::Fixed(0.5),
+                    ..Walk::default()
+                });
+            }
+        }
+
+        // Draw bars
+        for (label_idx, _label) in chart.labels.iter().enumerate() {
+            let group_x = origin.x + padding_left + label_idx as f64 * group_width;
+
+            for (series_idx, series) in chart.series.iter().enumerate() {
+                let val = series.values.get(label_idx).copied().unwrap_or(0.0);
+                let bar_height = (val / nice_max) * plot_height;
+
+                let bar_x = group_x + bar_spacing + series_idx as f64 * (bar_width + bar_spacing);
+                let bar_y = origin.y + padding_top + plot_height - bar_height;
+
+                self.draw_chart_bar.color = self.get_chart_color(chart, series_idx);
+                self.draw_chart_bar.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(bar_x, bar_y)),
+                    width: Size::Fixed(bar_width),
+                    height: Size::Fixed(bar_height.max(1.0)),
+                    ..Walk::default()
+                });
+            }
+
+            // X-axis label
+            let label_text = &chart.labels[label_idx];
+            let label_x = group_x + group_width / 2.0 - label_text.len() as f64 * 2.5;
+            let label_walk = Walk {
+                abs_pos: Some(dvec2(label_x, origin.y + padding_top + plot_height + 6.0)),
+                ..Walk::fit()
+            };
+            self.draw_chart_text.draw_walk(cx, label_walk, Align::default(), label_text);
+        }
+
+        // Legend
+        if chart.show_legend.unwrap_or(chart.series.len() > 1) {
+            let legend_x = origin.x + padding_left + 10.0;
+            let legend_y = origin.y + 6.0;
+            for (i, series) in chart.series.iter().enumerate() {
+                let default_name = format!("Series {}", i + 1);
+                let name = series.name.as_deref().unwrap_or(&default_name);
+                let lx = legend_x + i as f64 * 100.0;
+
+                // Color swatch
+                self.draw_chart_bar.color = self.get_chart_color(chart, i);
+                self.draw_chart_bar.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(lx, legend_y + 2.0)),
+                    width: Size::Fixed(10.0),
+                    height: Size::Fixed(10.0),
+                    ..Walk::default()
+                });
+
+                // Label
+                let name_walk = Walk {
+                    abs_pos: Some(dvec2(lx + 14.0, legend_y)),
+                    ..Walk::fit()
+                };
+                self.draw_chart_text.draw_walk(cx, name_walk, Align::default(), name);
+            }
+        }
+
+        cx.end_turtle();
+    }
+
+    fn render_line_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+        let padding_left = 50.0;
+        let padding_bottom = 30.0;
+        let padding_top = 30.0;
+        let padding_right = 20.0;
+
+        let plot_width = chart_width - padding_left - padding_right;
+        let plot_height = chart_height - padding_top - padding_bottom;
+
+        // Container
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        let layout = Layout::default();
+        cx.begin_turtle(walk, layout);
+        let origin = cx.turtle().pos();
+
+        // Title
+        if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                let title_walk = Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                };
+                self.draw_chart_text.draw_walk(cx, title_walk, Align::default(), &title);
+            }
+        }
+
+        // Find data range
+        let mut max_val: f64 = 0.0;
+        for series in &chart.series {
+            for &v in &series.values {
+                if v > max_val { max_val = v; }
+            }
+        }
+        if max_val == 0.0 { max_val = 1.0; }
+        let nice_max = Self::nice_number(max_val);
+
+        let point_count = chart.labels.len();
+        if point_count == 0 {
+            cx.end_turtle();
+            return;
+        }
+
+        // Draw axes
+        self.draw_chart_axis.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top)),
+            width: Size::Fixed(1.0),
+            height: Size::Fixed(plot_height),
+            ..Walk::default()
+        });
+        self.draw_chart_axis.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top + plot_height)),
+            width: Size::Fixed(plot_width),
+            height: Size::Fixed(1.0),
+            ..Walk::default()
+        });
+
+        // Y-axis labels
+        let tick_count = 5;
+        self.draw_chart_text.text_style.font_size = 9.0;
+        for i in 0..=tick_count {
+            let val = nice_max * i as f64 / tick_count as f64;
+            let y = origin.y + padding_top + plot_height - (plot_height * val / nice_max);
+            let label = if val >= 1000.0 {
+                format!("{:.0}k", val / 1000.0)
+            } else if val == val.floor() {
+                format!("{:.0}", val)
+            } else {
+                format!("{:.1}", val)
+            };
+            let label_walk = Walk {
+                abs_pos: Some(dvec2(origin.x + 4.0, y - 5.0)),
+                ..Walk::fit()
+            };
+            self.draw_chart_text.draw_walk(cx, label_walk, Align::default(), &label);
+
+            if i > 0 {
+                self.draw_chart_axis.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(origin.x + padding_left, y)),
+                    width: Size::Fixed(plot_width),
+                    height: Size::Fixed(0.5),
+                    ..Walk::default()
+                });
+            }
+        }
+
+        // X-axis labels
+        let step_x = if point_count > 1 { plot_width / (point_count - 1) as f64 } else { plot_width };
+        for (i, label) in chart.labels.iter().enumerate() {
+            let x = origin.x + padding_left + i as f64 * step_x;
+            let label_walk = Walk {
+                abs_pos: Some(dvec2(x - label.len() as f64 * 2.5, origin.y + padding_top + plot_height + 6.0)),
+                ..Walk::fit()
+            };
+            self.draw_chart_text.draw_walk(cx, label_walk, Align::default(), label);
+        }
+
+        // Draw line segments for each series
+        for (series_idx, series) in chart.series.iter().enumerate() {
+            let color = self.get_chart_color(chart, series_idx);
+
+            for i in 0..series.values.len().saturating_sub(1) {
+                let v1 = series.values[i];
+                let v2 = series.values[i + 1];
+
+                let x1_abs = origin.x + padding_left + i as f64 * step_x;
+                let y1_abs = origin.y + padding_top + plot_height - (v1 / nice_max) * plot_height;
+                let x2_abs = origin.x + padding_left + (i + 1) as f64 * step_x;
+                let y2_abs = origin.y + padding_top + plot_height - (v2 / nice_max) * plot_height;
+
+                // Bounding box for the line segment
+                let min_x = x1_abs.min(x2_abs) - 4.0;
+                let max_x = x1_abs.max(x2_abs) + 4.0;
+                let min_y = y1_abs.min(y2_abs) - 4.0;
+                let max_y = y1_abs.max(y2_abs) + 4.0;
+                let w = max_x - min_x;
+                let h = max_y - min_y;
+
+                // Normalize line endpoints to 0-1 within bounding box
+                self.draw_chart_line.color = color;
+                self.draw_chart_line.x1 = ((x1_abs - min_x) / w) as f32;
+                self.draw_chart_line.y1 = ((y1_abs - min_y) / h) as f32;
+                self.draw_chart_line.x2 = ((x2_abs - min_x) / w) as f32;
+                self.draw_chart_line.y2 = ((y2_abs - min_y) / h) as f32;
+                self.draw_chart_line.line_width = (3.0 / w.min(h)) as f32;
+
+                self.draw_chart_line.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(min_x, min_y)),
+                    width: Size::Fixed(w),
+                    height: Size::Fixed(h),
+                    ..Walk::default()
+                });
+            }
+
+            // Draw data points
+            for (i, &val) in series.values.iter().enumerate() {
+                let x = origin.x + padding_left + i as f64 * step_x;
+                let y = origin.y + padding_top + plot_height - (val / nice_max) * plot_height;
+                let dot_size = 6.0;
+
+                self.draw_chart_bar.color = color;
+                self.draw_chart_bar.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(x - dot_size / 2.0, y - dot_size / 2.0)),
+                    width: Size::Fixed(dot_size),
+                    height: Size::Fixed(dot_size),
+                    ..Walk::default()
+                });
+            }
+        }
+
+        // Legend
+        if chart.show_legend.unwrap_or(chart.series.len() > 1) {
+            let legend_x = origin.x + padding_left + 10.0;
+            let legend_y = origin.y + 6.0;
+            for (i, series) in chart.series.iter().enumerate() {
+                let default_name = format!("Series {}", i + 1);
+                let name = series.name.as_deref().unwrap_or(&default_name);
+                let lx = legend_x + i as f64 * 100.0;
+
+                self.draw_chart_bar.color = self.get_chart_color(chart, i);
+                self.draw_chart_bar.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(lx, legend_y + 2.0)),
+                    width: Size::Fixed(10.0),
+                    height: Size::Fixed(10.0),
+                    ..Walk::default()
+                });
+
+                let name_walk = Walk {
+                    abs_pos: Some(dvec2(lx + 14.0, legend_y)),
+                    ..Walk::fit()
+                };
+                self.draw_chart_text.draw_walk(cx, name_walk, Align::default(), name);
+            }
+        }
+
+        cx.end_turtle();
+    }
+
+    fn render_pie_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        let layout = Layout::default();
+        cx.begin_turtle(walk, layout);
+        let origin = cx.turtle().pos();
+
+        // Title
+        let title_height = if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                let title_walk = Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                };
+                self.draw_chart_text.draw_walk(cx, title_walk, Align::default(), &title);
+                24.0
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+
+        // Get values from first series
+        let values: Vec<f64> = chart.series.first()
+            .map(|s| s.values.clone())
+            .unwrap_or_default();
+
+        let total: f64 = values.iter().sum();
+        if total == 0.0 || values.is_empty() {
+            cx.end_turtle();
+            return;
+        }
+
+        // Pie geometry
+        let legend_width = 120.0;
+        let available_width = chart_width - legend_width;
+        let available_height = chart_height - title_height;
+        let radius = (available_width.min(available_height) / 2.0 - 10.0).max(30.0);
+        let center_x = origin.x + available_width / 2.0;
+        let center_y = origin.y + title_height + available_height / 2.0;
+
+        let pi = std::f64::consts::PI;
+        let mut current_angle = -pi / 2.0; // Start at 12 o'clock
+
+        for (i, &val) in values.iter().enumerate() {
+            let sweep = (val / total) * 2.0 * pi;
+
+            // Draw arc slice as a quad covering the pie bounds
+            let arc_size = radius * 2.0 + 4.0;
+            self.draw_chart_arc.color = self.get_chart_color(chart, i);
+            self.draw_chart_arc.start_angle = current_angle as f32;
+            self.draw_chart_arc.end_angle = (current_angle + sweep) as f32;
+            self.draw_chart_arc.inner_radius = 0.0;
+
+            self.draw_chart_arc.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(center_x - radius, center_y - radius)),
+                width: Size::Fixed(arc_size),
+                height: Size::Fixed(arc_size),
+                ..Walk::default()
+            });
+
+            current_angle += sweep;
+        }
+
+        // Legend
+        let legend_x = origin.x + available_width + 4.0;
+        let legend_y_start = origin.y + title_height + 20.0;
+        self.draw_chart_text.text_style.font_size = 10.0;
+
+        for (i, &val) in values.iter().enumerate() {
+            let label = if i < chart.labels.len() {
+                &chart.labels[i]
+            } else {
+                "?"
+            };
+            let pct = (val / total * 100.0) as i32;
+            let legend_str = format!("{} ({}%)", label, pct);
+            let ly = legend_y_start + i as f64 * 18.0;
+
+            // Color swatch
+            self.draw_chart_bar.color = self.get_chart_color(chart, i);
+            self.draw_chart_bar.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(legend_x, ly + 2.0)),
+                width: Size::Fixed(10.0),
+                height: Size::Fixed(10.0),
+                ..Walk::default()
+            });
+
+            // Label
+            let label_walk = Walk {
+                abs_pos: Some(dvec2(legend_x + 14.0, ly)),
+                ..Walk::fit()
+            };
+            self.draw_chart_text.draw_walk(cx, label_walk, Align::default(), &legend_str);
+        }
+
+        cx.end_turtle();
+    }
+
+    /// Round up to a "nice" number for axis scale
+    fn nice_number(val: f64) -> f64 {
+        if val <= 0.0 { return 1.0; }
+        let magnitude = 10.0_f64.powf(val.log10().floor());
+        let fraction = val / magnitude;
+        let nice_fraction = if fraction <= 1.0 {
+            1.0
+        } else if fraction <= 2.0 {
+            2.0
+        } else if fraction <= 5.0 {
+            5.0
+        } else {
+            10.0
+        };
+        nice_fraction * magnitude
+    }
+
+    /// Round down to a "nice" number for axis minimum
+    fn nice_floor_number(val: f64) -> f64 {
+        if val <= 0.0 { return 0.0; }
+        let magnitude = 10.0_f64.powf(val.log10().floor());
+        let fraction = val / magnitude;
+        let nice_fraction = if fraction < 1.5 {
+            1.0
+        } else if fraction < 3.0 {
+            2.0
+        } else if fraction < 7.0 {
+            5.0
+        } else {
+            10.0
+        };
+        (nice_fraction - if nice_fraction > 1.0 { nice_fraction / 2.0 } else { 0.0 }) * magnitude
+    }
+
+    /// Interpolate between two colors
+    fn lerp_color(c1: Vec4, c2: Vec4, t: f64) -> Vec4 {
+        let t = t as f32;
+        Vec4 {
+            x: c1.x + (c2.x - c1.x) * t,
+            y: c1.y + (c2.y - c1.y) * t,
+            z: c1.z + (c2.z - c1.z) * t,
+            w: 1.0,
+        }
+    }
+
+    // ========================================================================
+    // AREA CHART
+    // ========================================================================
+    fn render_area_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+        let padding_left = 50.0;
+        let padding_bottom = 30.0;
+        let padding_top = 30.0;
+        let padding_right = 20.0;
+        let plot_width = chart_width - padding_left - padding_right;
+        let plot_height = chart_height - padding_top - padding_bottom;
+
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        cx.begin_turtle(walk, Layout::default());
+        let origin = cx.turtle().pos();
+
+        // Title
+        if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                let title_walk = Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                };
+                self.draw_chart_text.draw_walk(cx, title_walk, Align::default(), &title);
+            }
+        }
+
+        // Find max value
+        let mut max_val: f64 = 0.0;
+        for series in &chart.series {
+            for &v in &series.values { if v > max_val { max_val = v; } }
+        }
+        if max_val == 0.0 { max_val = 1.0; }
+        let nice_max = Self::nice_number(max_val);
+        let label_count = chart.labels.len();
+        if label_count == 0 { cx.end_turtle(); return; }
+
+        // Axes
+        self.draw_chart_axis.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top)),
+            width: Size::Fixed(1.0), height: Size::Fixed(plot_height), ..Walk::default()
+        });
+        self.draw_chart_axis.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top + plot_height)),
+            width: Size::Fixed(plot_width), height: Size::Fixed(1.0), ..Walk::default()
+        });
+
+        // Y-axis labels
+        self.draw_chart_text.text_style.font_size = 9.0;
+        for i in 0..=5 {
+            let frac = i as f64 / 5.0;
+            let y = origin.y + padding_top + plot_height * (1.0 - frac);
+            let val = nice_max * frac;
+            let label = if val >= 1000.0 { format!("{}k", (val / 1000.0) as i64) } else { format!("{}", val as i64) };
+            self.draw_chart_text.draw_walk(cx, Walk { abs_pos: Some(dvec2(origin.x + 4.0, y - 5.0)), ..Walk::fit() }, Align::default(), &label);
+            // Grid
+            self.draw_chart_axis.color = Vec4 { x: 0.2, y: 0.25, z: 0.35, w: 0.3 };
+            self.draw_chart_axis.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(origin.x + padding_left, y)),
+                width: Size::Fixed(plot_width), height: Size::Fixed(0.5), ..Walk::default()
+            });
+            self.draw_chart_axis.color = Vec4 { x: 0.333, y: 0.4, z: 0.533, w: 1.0 };
+        }
+
+        let step_x = plot_width / (label_count as f64 - 1.0).max(1.0);
+
+        // Draw areas (back to front)
+        for (si, series) in chart.series.iter().enumerate().rev() {
+            let color = self.get_chart_color(chart, si);
+            // Filled area strips
+            self.draw_chart_triangle.color = color;
+            self.draw_chart_triangle.opacity = 0.25;
+            for i in 0..series.values.len().saturating_sub(1).min(label_count.saturating_sub(1)) {
+                let x1 = origin.x + padding_left + i as f64 * step_x;
+                let x2 = origin.x + padding_left + (i + 1) as f64 * step_x;
+                let y1 = origin.y + padding_top + plot_height * (1.0 - series.values[i] / nice_max);
+                let y2 = origin.y + padding_top + plot_height * (1.0 - series.values[i + 1] / nice_max);
+                let top = y1.min(y2);
+                let bottom = origin.y + padding_top + plot_height;
+                self.draw_chart_triangle.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(x1, top)),
+                    width: Size::Fixed(x2 - x1), height: Size::Fixed(bottom - top), ..Walk::default()
+                });
+            }
+        }
+
+        // Draw lines on top
+        for (si, series) in chart.series.iter().enumerate() {
+            let color = self.get_chart_color(chart, si);
+            for i in 0..series.values.len().saturating_sub(1).min(label_count.saturating_sub(1)) {
+                let x1 = origin.x + padding_left + i as f64 * step_x;
+                let x2 = origin.x + padding_left + (i + 1) as f64 * step_x;
+                let y1 = origin.y + padding_top + plot_height * (1.0 - series.values[i] / nice_max);
+                let y2 = origin.y + padding_top + plot_height * (1.0 - series.values[i + 1] / nice_max);
+                let min_x = x1.min(x2); let max_x = x1.max(x2);
+                let min_y = y1.min(y2); let max_y = y1.max(y2);
+                let margin = 10.0;
+                let bx = min_x - margin; let by = min_y - margin;
+                let w = (max_x - min_x) + margin * 2.0; let h = (max_y - min_y) + margin * 2.0;
+                self.draw_chart_line.color = color;
+                self.draw_chart_line.x1 = ((x1 - bx) / w) as f32;
+                self.draw_chart_line.y1 = ((y1 - by) / h) as f32;
+                self.draw_chart_line.x2 = ((x2 - bx) / w) as f32;
+                self.draw_chart_line.y2 = ((y2 - by) / h) as f32;
+                self.draw_chart_line.line_width = (3.0 / w.min(h)) as f32;
+                self.draw_chart_line.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(bx, by)),
+                    width: Size::Fixed(w), height: Size::Fixed(h), ..Walk::default()
+                });
+            }
+            // Data points
+            for i in 0..series.values.len().min(label_count) {
+                let px = origin.x + padding_left + i as f64 * step_x;
+                let py = origin.y + padding_top + plot_height * (1.0 - series.values[i] / nice_max);
+                self.draw_chart_point.color = color;
+                self.draw_chart_point.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(px - 3.0, py - 3.0)),
+                    width: Size::Fixed(6.0), height: Size::Fixed(6.0), ..Walk::default()
+                });
+            }
+        }
+
+        // X-axis labels
+        self.draw_chart_text.text_style.font_size = 9.0;
+        for (i, label) in chart.labels.iter().enumerate() {
+            let x = origin.x + padding_left + i as f64 * step_x;
+            self.draw_chart_text.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(x - label.len() as f64 * 2.5, origin.y + padding_top + plot_height + 6.0)),
+                ..Walk::fit()
+            }, Align::default(), label);
+        }
+
+        // Legend
+        if chart.series.len() > 1 {
+            let legend_x = origin.x + padding_left + 10.0;
+            let mut ly = origin.y + padding_top + 4.0;
+            self.draw_chart_text.text_style.font_size = 9.0;
+            for (i, series) in chart.series.iter().enumerate() {
+                let color = self.get_chart_color(chart, i);
+                let default_name = format!("Series {}", i + 1);
+                let name = series.name.as_deref().unwrap_or(&default_name);
+                self.draw_chart_bar.color = color;
+                self.draw_chart_bar.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(legend_x, ly + 2.0)),
+                    width: Size::Fixed(10.0), height: Size::Fixed(10.0), ..Walk::default()
+                });
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(legend_x + 14.0, ly)),
+                    ..Walk::fit()
+                }, Align::default(), name);
+                ly += 16.0;
+            }
+        }
+
+        cx.end_turtle();
+    }
+
+    // ========================================================================
+    // SCATTER CHART
+    // ========================================================================
+    fn render_scatter_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+        let padding_left = 55.0;
+        let padding_bottom = 30.0;
+        let padding_top = 30.0;
+        let padding_right = 20.0;
+        let plot_width = chart_width - padding_left - padding_right;
+        let plot_height = chart_height - padding_top - padding_bottom;
+
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        cx.begin_turtle(walk, Layout::default());
+        let origin = cx.turtle().pos();
+
+        // Title
+        if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                }, Align::default(), &title);
+            }
+        }
+
+        if chart.series.is_empty() { cx.end_turtle(); return; }
+
+        // Get X/Y data
+        let x_values = &chart.series[0].values;
+        let y_values = if chart.series.len() >= 2 { &chart.series[1].values } else { x_values };
+        let n = x_values.len().min(y_values.len());
+        if n == 0 { cx.end_turtle(); return; }
+
+        let x_min = x_values.iter().copied().fold(f64::INFINITY, f64::min);
+        let x_max = x_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let y_min = y_values.iter().copied().fold(f64::INFINITY, f64::min);
+        let y_max = y_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let nice_x_max = Self::nice_number(x_max);
+        let nice_y_max = Self::nice_number(y_max);
+        let nice_x_min = if x_min > 0.0 { 0.0 } else { -Self::nice_number(-x_min) };
+        let nice_y_min = if y_min > 0.0 { 0.0 } else { -Self::nice_number(-y_min) };
+        let x_range = (nice_x_max - nice_x_min).max(1.0);
+        let y_range = (nice_y_max - nice_y_min).max(1.0);
+
+        // Axes
+        self.draw_chart_axis.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top)),
+            width: Size::Fixed(1.0), height: Size::Fixed(plot_height), ..Walk::default()
+        });
+        self.draw_chart_axis.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top + plot_height)),
+            width: Size::Fixed(plot_width), height: Size::Fixed(1.0), ..Walk::default()
+        });
+
+        // Y-axis labels
+        self.draw_chart_text.text_style.font_size = 9.0;
+        for i in 0..=5 {
+            let frac = i as f64 / 5.0;
+            let y = origin.y + padding_top + plot_height * (1.0 - frac);
+            let val = nice_y_min + y_range * frac;
+            let label = format!("{:.0}", val);
+            self.draw_chart_text.draw_walk(cx, Walk { abs_pos: Some(dvec2(origin.x + 4.0, y - 5.0)), ..Walk::fit() }, Align::default(), &label);
+        }
+
+        // X-axis labels
+        for i in 0..=5 {
+            let frac = i as f64 / 5.0;
+            let x = origin.x + padding_left + plot_width * frac;
+            let val = nice_x_min + x_range * frac;
+            let label = format!("{:.0}", val);
+            self.draw_chart_text.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(x - label.len() as f64 * 2.5, origin.y + padding_top + plot_height + 6.0)),
+                ..Walk::fit()
+            }, Align::default(), &label);
+        }
+
+        // Plot points
+        let color = self.get_chart_color(chart, 0);
+        for i in 0..n {
+            let px = origin.x + padding_left + ((x_values[i] - nice_x_min) / x_range) * plot_width;
+            let py = origin.y + padding_top + plot_height * (1.0 - (y_values[i] - nice_y_min) / y_range);
+            self.draw_chart_point.color = color;
+            self.draw_chart_point.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(px - 4.0, py - 4.0)),
+                width: Size::Fixed(8.0), height: Size::Fixed(8.0), ..Walk::default()
+            });
+            // Optional label
+            if i < chart.labels.len() {
+                self.draw_chart_text.text_style.font_size = 8.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(px + 5.0, py - 4.0)),
+                    ..Walk::fit()
+                }, Align::default(), &chart.labels[i]);
+            }
+        }
+
+        cx.end_turtle();
+    }
+
+    // ========================================================================
+    // RADAR / SPIDER CHART
+    // ========================================================================
+    fn render_radar_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        cx.begin_turtle(walk, Layout::default());
+        let origin = cx.turtle().pos();
+
+        let mut title_height = 0.0;
+        if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                }, Align::default(), &title);
+                title_height = 24.0;
+            }
+        }
+
+        let axis_count = chart.labels.len();
+        if axis_count < 3 || chart.series.is_empty() { cx.end_turtle(); return; }
+
+        let center_x = origin.x + chart_width / 2.0;
+        let center_y = origin.y + title_height + (chart_height - title_height) / 2.0;
+        let radius = (chart_width.min(chart_height - title_height) * 0.35).max(40.0);
+        let pi2 = std::f64::consts::PI * 2.0;
+        let half_pi = std::f64::consts::PI / 2.0;
+
+        // Find max across all series for normalization
+        let mut max_val: f64 = 0.0;
+        for series in &chart.series {
+            for &v in &series.values { if v > max_val { max_val = v; } }
+        }
+        if max_val == 0.0 { max_val = 1.0; }
+
+        // Draw concentric rings (5 levels)
+        self.draw_chart_axis.color = Vec4 { x: 0.25, y: 0.3, z: 0.4, w: 0.4 };
+        for ring in &[0.2, 0.4, 0.6, 0.8, 1.0] {
+            let r = radius * ring;
+            for i in 0..axis_count {
+                let a1 = (i as f64 / axis_count as f64) * pi2 - half_pi;
+                let a2 = ((i + 1) as f64 / axis_count as f64) * pi2 - half_pi;
+                let x1 = center_x + a1.cos() * r;
+                let y1 = center_y + a1.sin() * r;
+                let x2 = center_x + a2.cos() * r;
+                let y2 = center_y + a2.sin() * r;
+                let min_x = x1.min(x2); let min_y = y1.min(y2);
+                let max_x = x1.max(x2); let max_y = y1.max(y2);
+                let m = 6.0;
+                let bx = min_x - m; let by = min_y - m;
+                let w = (max_x - min_x) + m * 2.0; let h = (max_y - min_y) + m * 2.0;
+                if w > 0.1 && h > 0.1 {
+                    self.draw_chart_line.color = Vec4 { x: 0.25, y: 0.3, z: 0.4, w: 0.4 };
+                    self.draw_chart_line.x1 = ((x1 - bx) / w) as f32;
+                    self.draw_chart_line.y1 = ((y1 - by) / h) as f32;
+                    self.draw_chart_line.x2 = ((x2 - bx) / w) as f32;
+                    self.draw_chart_line.y2 = ((y2 - by) / h) as f32;
+                    self.draw_chart_line.line_width = (1.5 / w.min(h)) as f32;
+                    self.draw_chart_line.draw_walk(cx, Walk {
+                        abs_pos: Some(dvec2(bx, by)),
+                        width: Size::Fixed(w), height: Size::Fixed(h), ..Walk::default()
+                    });
+                }
+            }
+        }
+
+        // Draw axis spokes + labels
+        self.draw_chart_axis.color = Vec4 { x: 0.333, y: 0.4, z: 0.533, w: 0.6 };
+        for i in 0..axis_count {
+            let angle = (i as f64 / axis_count as f64) * pi2 - half_pi;
+            let x_end = center_x + angle.cos() * radius;
+            let y_end = center_y + angle.sin() * radius;
+            // Spoke line
+            self.draw_chart_axis.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(center_x.min(x_end), center_y.min(y_end))),
+                width: Size::Fixed((x_end - center_x).abs().max(1.0)),
+                height: Size::Fixed((y_end - center_y).abs().max(1.0)),
+                ..Walk::default()
+            });
+            // Label
+            let label_r = radius + 12.0;
+            let lx = center_x + angle.cos() * label_r - chart.labels[i].len() as f64 * 3.0;
+            let ly = center_y + angle.sin() * label_r - 5.0;
+            self.draw_chart_text.text_style.font_size = 9.0;
+            self.draw_chart_text.draw_walk(cx, Walk { abs_pos: Some(dvec2(lx, ly)), ..Walk::fit() }, Align::default(), &chart.labels[i]);
+        }
+
+        // Draw data polygons (filled + outline)
+        for (si, series) in chart.series.iter().enumerate() {
+            let color = self.get_chart_color(chart, si);
+            let n = series.values.len().min(axis_count);
+            let mut vertices = Vec::with_capacity(n);
+            for i in 0..n {
+                let angle = (i as f64 / axis_count as f64) * pi2 - half_pi;
+                let normalized = (series.values[i] / max_val).clamp(0.0, 1.0);
+                vertices.push((
+                    center_x + angle.cos() * radius * normalized,
+                    center_y + angle.sin() * radius * normalized,
+                ));
+            }
+
+            // Fill polygon using triangle fan strips from center
+            self.draw_chart_triangle.color = color;
+            self.draw_chart_triangle.opacity = 0.2;
+            for i in 0..vertices.len() {
+                let j = (i + 1) % vertices.len();
+                let (vx1, vy1) = vertices[i];
+                let (vx2, vy2) = vertices[j];
+                let min_x = center_x.min(vx1).min(vx2);
+                let min_y = center_y.min(vy1).min(vy2);
+                let max_x = center_x.max(vx1).max(vx2);
+                let max_y = center_y.max(vy1).max(vy2);
+                self.draw_chart_triangle.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(min_x, min_y)),
+                    width: Size::Fixed((max_x - min_x).max(1.0)),
+                    height: Size::Fixed((max_y - min_y).max(1.0)),
+                    ..Walk::default()
+                });
+            }
+
+            // Outline
+            for i in 0..vertices.len() {
+                let j = (i + 1) % vertices.len();
+                let (x1, y1) = vertices[i];
+                let (x2, y2) = vertices[j];
+                let min_x = x1.min(x2); let min_y = y1.min(y2);
+                let max_x = x1.max(x2); let max_y = y1.max(y2);
+                let m = 6.0;
+                let bx = min_x - m; let by = min_y - m;
+                let w = (max_x - min_x) + m * 2.0; let h = (max_y - min_y) + m * 2.0;
+                if w > 0.1 && h > 0.1 {
+                    self.draw_chart_line.color = color;
+                    self.draw_chart_line.x1 = ((x1 - bx) / w) as f32;
+                    self.draw_chart_line.y1 = ((y1 - by) / h) as f32;
+                    self.draw_chart_line.x2 = ((x2 - bx) / w) as f32;
+                    self.draw_chart_line.y2 = ((y2 - by) / h) as f32;
+                    self.draw_chart_line.line_width = (2.5 / w.min(h)) as f32;
+                    self.draw_chart_line.draw_walk(cx, Walk {
+                        abs_pos: Some(dvec2(bx, by)),
+                        width: Size::Fixed(w), height: Size::Fixed(h), ..Walk::default()
+                    });
+                }
+            }
+
+            // Vertex dots
+            for &(vx, vy) in &vertices {
+                self.draw_chart_point.color = color;
+                self.draw_chart_point.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(vx - 3.0, vy - 3.0)),
+                    width: Size::Fixed(6.0), height: Size::Fixed(6.0), ..Walk::default()
+                });
+            }
+        }
+
+        // Legend
+        if chart.series.len() > 1 {
+            let legend_x = origin.x + 8.0;
+            let mut ly = origin.y + title_height + 4.0;
+            self.draw_chart_text.text_style.font_size = 9.0;
+            for (i, series) in chart.series.iter().enumerate() {
+                let color = self.get_chart_color(chart, i);
+                let default_name = format!("Series {}", i + 1);
+                let name = series.name.as_deref().unwrap_or(&default_name);
+                self.draw_chart_bar.color = color;
+                self.draw_chart_bar.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(legend_x, ly + 2.0)),
+                    width: Size::Fixed(10.0), height: Size::Fixed(10.0), ..Walk::default()
+                });
+                self.draw_chart_text.draw_walk(cx, Walk { abs_pos: Some(dvec2(legend_x + 14.0, ly)), ..Walk::fit() }, Align::default(), name);
+                ly += 16.0;
+            }
+        }
+
+        cx.end_turtle();
+    }
+
+    // ========================================================================
+    // GAUGE CHART
+    // ========================================================================
+    fn render_gauge_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        cx.begin_turtle(walk, Layout::default());
+        let origin = cx.turtle().pos();
+
+        let mut title_height = 0.0;
+        if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                }, Align::default(), &title);
+                title_height = 24.0;
+            }
+        }
+
+        let value = chart.series.first().and_then(|s| s.values.first().copied()).unwrap_or(0.0);
+        let max_value = chart.max_value.unwrap_or(100.0);
+        let pct = (value / max_value).clamp(0.0, 1.0);
+
+        let available_h = chart_height - title_height;
+        let gauge_size = chart_width.min(available_h * 1.6) * 0.85;
+        let cx_pos = origin.x + chart_width / 2.0;
+        let cy_pos = origin.y + title_height + available_h * 0.55;
+
+        // Arc geometry: 240 degrees from 150° to 390° (clockwise from bottom-left to bottom-right)
+        let start_angle = 150.0_f64.to_radians();
+        let total_sweep = 240.0_f64.to_radians();
+
+        let arc_box = gauge_size;
+        let arc_x = cx_pos - arc_box / 2.0;
+        let arc_y = cy_pos - arc_box / 2.0;
+
+        // Background arc (gray)
+        self.draw_chart_arc.color = Vec4 { x: 0.2, y: 0.25, z: 0.35, w: 0.5 };
+        self.draw_chart_arc.start_angle = start_angle as f32;
+        self.draw_chart_arc.end_angle = (start_angle + total_sweep) as f32;
+        self.draw_chart_arc.inner_radius = 0.7;
+        self.draw_chart_arc.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(arc_x, arc_y)),
+            width: Size::Fixed(arc_box), height: Size::Fixed(arc_box), ..Walk::default()
+        });
+
+        // Value arc with color zones or single color
+        if chart.colors.len() >= 3 {
+            let zones = [(0.0, 0.6), (0.6, 0.8), (0.8, 1.0)];
+            for (i, &(zone_start, zone_end)) in zones.iter().enumerate() {
+                if let Some(color) = Self::parse_hex_color(&chart.colors[i]) {
+                    let s = start_angle + total_sweep * zone_start;
+                    let e = start_angle + total_sweep * zone_end.min(pct);
+                    if e > s {
+                        self.draw_chart_arc.color = color;
+                        self.draw_chart_arc.start_angle = s as f32;
+                        self.draw_chart_arc.end_angle = e as f32;
+                        self.draw_chart_arc.inner_radius = 0.72;
+                        self.draw_chart_arc.draw_walk(cx, Walk {
+                            abs_pos: Some(dvec2(arc_x, arc_y)),
+                            width: Size::Fixed(arc_box), height: Size::Fixed(arc_box), ..Walk::default()
+                        });
+                    }
+                }
+            }
+        } else {
+            let color = self.get_chart_color(chart, 0);
+            self.draw_chart_arc.color = color;
+            self.draw_chart_arc.start_angle = start_angle as f32;
+            self.draw_chart_arc.end_angle = (start_angle + total_sweep * pct) as f32;
+            self.draw_chart_arc.inner_radius = 0.72;
+            self.draw_chart_arc.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(arc_x, arc_y)),
+                width: Size::Fixed(arc_box), height: Size::Fixed(arc_box), ..Walk::default()
+            });
+        }
+
+        // Value text
+        let val_str = if value == value.floor() { format!("{:.0}", value) } else { format!("{:.1}", value) };
+        self.draw_chart_text.text_style.font_size = 22.0;
+        self.draw_chart_text.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(cx_pos - val_str.len() as f64 * 7.0, cy_pos - 12.0)),
+            ..Walk::fit()
+        }, Align::default(), &val_str);
+
+        // Unit/label
+        let unit = if chart.labels.len() >= 2 { &chart.labels[1] } else if !chart.labels.is_empty() { &chart.labels[0] } else { "" };
+        if !unit.is_empty() {
+            self.draw_chart_text.text_style.font_size = 11.0;
+            self.draw_chart_text.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(cx_pos - unit.len() as f64 * 3.5, cy_pos + 14.0)),
+                ..Walk::fit()
+            }, Align::default(), unit);
+        }
+
+        // Label below gauge
+        if !chart.labels.is_empty() {
+            self.draw_chart_text.text_style.font_size = 10.0;
+            self.draw_chart_text.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(cx_pos - chart.labels[0].len() as f64 * 3.0, cy_pos + arc_box * 0.3)),
+                ..Walk::fit()
+            }, Align::default(), &chart.labels[0]);
+        }
+
+        cx.end_turtle();
+    }
+
+    // ========================================================================
+    // BUBBLE CHART
+    // ========================================================================
+    fn render_bubble_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+        let padding_left = 55.0;
+        let padding_bottom = 30.0;
+        let padding_top = 30.0;
+        let padding_right = 20.0;
+        let plot_width = chart_width - padding_left - padding_right;
+        let plot_height = chart_height - padding_top - padding_bottom;
+
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        cx.begin_turtle(walk, Layout::default());
+        let origin = cx.turtle().pos();
+
+        if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                }, Align::default(), &title);
+            }
+        }
+
+        if chart.series.len() < 2 { cx.end_turtle(); return; }
+
+        let x_vals = &chart.series[0].values;
+        let y_vals = &chart.series[1].values;
+        let size_vals: Vec<f64> = if chart.series.len() >= 3 {
+            chart.series[2].values.clone()
+        } else {
+            vec![10.0; x_vals.len()]
+        };
+        let n = x_vals.len().min(y_vals.len()).min(size_vals.len());
+        if n == 0 { cx.end_turtle(); return; }
+
+        let x_max = Self::nice_number(x_vals.iter().copied().fold(0.0_f64, f64::max));
+        let y_max = Self::nice_number(y_vals.iter().copied().fold(0.0_f64, f64::max));
+        let size_max = size_vals.iter().copied().fold(0.0_f64, f64::max).max(1.0);
+
+        // Axes
+        self.draw_chart_axis.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top)),
+            width: Size::Fixed(1.0), height: Size::Fixed(plot_height), ..Walk::default()
+        });
+        self.draw_chart_axis.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top + plot_height)),
+            width: Size::Fixed(plot_width), height: Size::Fixed(1.0), ..Walk::default()
+        });
+
+        // Axis labels
+        self.draw_chart_text.text_style.font_size = 9.0;
+        for i in 0..=4 {
+            let frac = i as f64 / 4.0;
+            let y = origin.y + padding_top + plot_height * (1.0 - frac);
+            let label = format!("{:.0}", y_max * frac);
+            self.draw_chart_text.draw_walk(cx, Walk { abs_pos: Some(dvec2(origin.x + 4.0, y - 5.0)), ..Walk::fit() }, Align::default(), &label);
+            let x = origin.x + padding_left + plot_width * frac;
+            let xlabel = format!("{:.0}", x_max * frac);
+            self.draw_chart_text.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(x - xlabel.len() as f64 * 2.5, origin.y + padding_top + plot_height + 6.0)),
+                ..Walk::fit()
+            }, Align::default(), &xlabel);
+        }
+
+        // Bubbles
+        let min_bubble = 8.0;
+        let max_bubble = 40.0;
+        for i in 0..n {
+            let px = origin.x + padding_left + (x_vals[i] / x_max) * plot_width;
+            let py = origin.y + padding_top + plot_height * (1.0 - y_vals[i] / y_max);
+            let bubble_r = min_bubble + (size_vals[i] / size_max) * (max_bubble - min_bubble);
+            let color = self.get_chart_color(chart, i);
+            self.draw_chart_point.color = Vec4 { x: color.x, y: color.y, z: color.z, w: 0.7 };
+            self.draw_chart_point.border_width = 2.0;
+            self.draw_chart_point.border_color = color;
+            self.draw_chart_point.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(px - bubble_r, py - bubble_r)),
+                width: Size::Fixed(bubble_r * 2.0), height: Size::Fixed(bubble_r * 2.0), ..Walk::default()
+            });
+            // Label
+            if i < chart.labels.len() {
+                self.draw_chart_text.text_style.font_size = 8.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(px - chart.labels[i].len() as f64 * 2.5, py + bubble_r + 3.0)),
+                    ..Walk::fit()
+                }, Align::default(), &chart.labels[i]);
+            }
+        }
+
+        cx.end_turtle();
+    }
+
+    // ========================================================================
+    // CANDLESTICK CHART
+    // ========================================================================
+    fn render_candlestick_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+        let padding_left = 55.0;
+        let padding_bottom = 30.0;
+        let padding_top = 30.0;
+        let padding_right = 15.0;
+        let plot_width = chart_width - padding_left - padding_right;
+        let plot_height = chart_height - padding_top - padding_bottom;
+
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        cx.begin_turtle(walk, Layout::default());
+        let origin = cx.turtle().pos();
+
+        if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                }, Align::default(), &title);
+            }
+        }
+
+        // Need exactly 4 series: open, high, low, close
+        if chart.series.len() < 4 { cx.end_turtle(); return; }
+        let open = &chart.series[0].values;
+        let high = &chart.series[1].values;
+        let low = &chart.series[2].values;
+        let close = &chart.series[3].values;
+        let candle_count = chart.labels.len().min(open.len()).min(high.len()).min(low.len()).min(close.len());
+        if candle_count == 0 { cx.end_turtle(); return; }
+
+        // Y range from all highs and lows
+        let mut y_min = f64::INFINITY;
+        let mut y_max = f64::NEG_INFINITY;
+        for i in 0..candle_count {
+            if high[i] > y_max { y_max = high[i]; }
+            if low[i] < y_min { y_min = low[i]; }
+        }
+        let nice_max = Self::nice_number(y_max);
+        let nice_min = Self::nice_floor_number(y_min);
+        let y_range = (nice_max - nice_min).max(1.0);
+
+        // Axes
+        self.draw_chart_axis.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top)),
+            width: Size::Fixed(1.0), height: Size::Fixed(plot_height), ..Walk::default()
+        });
+        self.draw_chart_axis.draw_walk(cx, Walk {
+            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top + plot_height)),
+            width: Size::Fixed(plot_width), height: Size::Fixed(1.0), ..Walk::default()
+        });
+
+        // Y-axis labels
+        self.draw_chart_text.text_style.font_size = 9.0;
+        for i in 0..=5 {
+            let frac = i as f64 / 5.0;
+            let y = origin.y + padding_top + plot_height * (1.0 - frac);
+            let val = nice_min + y_range * frac;
+            let label = format!("{:.1}", val);
+            self.draw_chart_text.draw_walk(cx, Walk { abs_pos: Some(dvec2(origin.x + 4.0, y - 5.0)), ..Walk::fit() }, Align::default(), &label);
+            // Grid
+            self.draw_chart_axis.color = Vec4 { x: 0.2, y: 0.25, z: 0.35, w: 0.3 };
+            self.draw_chart_axis.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(origin.x + padding_left, y)),
+                width: Size::Fixed(plot_width), height: Size::Fixed(0.5), ..Walk::default()
+            });
+            self.draw_chart_axis.color = Vec4 { x: 0.333, y: 0.4, z: 0.533, w: 1.0 };
+        }
+
+        let up_color = if !chart.colors.is_empty() { Self::parse_hex_color(&chart.colors[0]).unwrap_or(Vec4 { x: 0.063, y: 0.725, z: 0.506, w: 1.0 }) } else { Vec4 { x: 0.063, y: 0.725, z: 0.506, w: 1.0 } };
+        let down_color = if chart.colors.len() >= 2 { Self::parse_hex_color(&chart.colors[1]).unwrap_or(Vec4 { x: 0.937, y: 0.333, z: 0.314, w: 1.0 }) } else { Vec4 { x: 0.937, y: 0.333, z: 0.314, w: 1.0 } };
+
+        let group_width = plot_width / candle_count as f64;
+        let candle_w = group_width * 0.6;
+
+        for i in 0..candle_count {
+            let is_up = close[i] >= open[i];
+            let color = if is_up { up_color } else { down_color };
+            let center_x = origin.x + padding_left + (i as f64 + 0.5) * group_width;
+
+            // Wick
+            let wick_top = origin.y + padding_top + plot_height * (1.0 - (high[i] - nice_min) / y_range);
+            let wick_bot = origin.y + padding_top + plot_height * (1.0 - (low[i] - nice_min) / y_range);
+            self.draw_chart_axis.color = color;
+            self.draw_chart_axis.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(center_x - 0.5, wick_top)),
+                width: Size::Fixed(1.0), height: Size::Fixed((wick_bot - wick_top).max(1.0)), ..Walk::default()
+            });
+            self.draw_chart_axis.color = Vec4 { x: 0.333, y: 0.4, z: 0.533, w: 1.0 };
+
+            // Body
+            let body_top_val = open[i].max(close[i]);
+            let body_bot_val = open[i].min(close[i]);
+            let bt = origin.y + padding_top + plot_height * (1.0 - (body_top_val - nice_min) / y_range);
+            let bb = origin.y + padding_top + plot_height * (1.0 - (body_bot_val - nice_min) / y_range);
+            self.draw_chart_bar.color = color;
+            self.draw_chart_bar.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(center_x - candle_w / 2.0, bt)),
+                width: Size::Fixed(candle_w), height: Size::Fixed((bb - bt).max(1.0)), ..Walk::default()
+            });
+        }
+
+        // X-axis labels
+        self.draw_chart_text.text_style.font_size = 9.0;
+        for (i, label) in chart.labels.iter().take(candle_count).enumerate() {
+            let x = origin.x + padding_left + (i as f64 + 0.5) * group_width;
+            self.draw_chart_text.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(x - label.len() as f64 * 2.5, origin.y + padding_top + plot_height + 6.0)),
+                ..Walk::fit()
+            }, Align::default(), label);
+        }
+
+        cx.end_turtle();
+    }
+
+    // ========================================================================
+    // HEATMAP CHART
+    // ========================================================================
+    fn render_heatmap_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        cx.begin_turtle(walk, Layout::default());
+        let origin = cx.turtle().pos();
+
+        let mut title_height = 0.0;
+        if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                }, Align::default(), &title);
+                title_height = 24.0;
+            }
+        }
+
+        let col_count = chart.labels.len();
+        let row_count = chart.series.len();
+        if col_count == 0 || row_count == 0 { cx.end_turtle(); return; }
+
+        let left_margin = 65.0;
+        let top_margin = 20.0;
+        let right_margin = 50.0;
+        let bottom_margin = 10.0;
+
+        let plot_w = chart_width - left_margin - right_margin;
+        let plot_h = chart_height - title_height - top_margin - bottom_margin;
+        let cell_w = plot_w / col_count as f64;
+        let cell_h = plot_h / row_count as f64;
+
+        // Find value range
+        let mut v_min = f64::INFINITY;
+        let mut v_max = f64::NEG_INFINITY;
+        for series in &chart.series {
+            for &v in &series.values {
+                if v < v_min { v_min = v; }
+                if v > v_max { v_max = v; }
+            }
+        }
+        if (v_max - v_min).abs() < 0.001 { v_max = v_min + 1.0; }
+
+        let low_color = if !chart.colors.is_empty() { Self::parse_hex_color(&chart.colors[0]).unwrap_or(Vec4 { x: 0.1, y: 0.1, z: 0.18, w: 1.0 }) } else { Vec4 { x: 0.1, y: 0.1, z: 0.18, w: 1.0 } };
+        let high_color = if chart.colors.len() >= 2 { Self::parse_hex_color(&chart.colors[1]).unwrap_or(Vec4 { x: 0.231, y: 0.510, z: 0.965, w: 1.0 }) } else { Vec4 { x: 0.231, y: 0.510, z: 0.965, w: 1.0 } };
+
+        // Draw cells
+        for (ri, series) in chart.series.iter().enumerate() {
+            for (ci, &val) in series.values.iter().enumerate().take(col_count) {
+                let t = ((val - v_min) / (v_max - v_min)).clamp(0.0, 1.0);
+                let color = Self::lerp_color(low_color, high_color, t);
+                let cx_pos = origin.x + left_margin + ci as f64 * cell_w;
+                let cy_pos = origin.y + title_height + top_margin + ri as f64 * cell_h;
+                self.draw_chart_bar.color = color;
+                self.draw_chart_bar.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(cx_pos + 1.0, cy_pos + 1.0)),
+                    width: Size::Fixed(cell_w - 2.0), height: Size::Fixed(cell_h - 2.0), ..Walk::default()
+                });
+                // Value text inside cell
+                if cell_w > 28.0 && cell_h > 16.0 {
+                    self.draw_chart_text.text_style.font_size = 8.0;
+                    let vstr = format!("{:.0}", val);
+                    self.draw_chart_text.draw_walk(cx, Walk {
+                        abs_pos: Some(dvec2(cx_pos + cell_w / 2.0 - vstr.len() as f64 * 2.5, cy_pos + cell_h / 2.0 - 5.0)),
+                        ..Walk::fit()
+                    }, Align::default(), &vstr);
+                }
+            }
+        }
+
+        // Column headers
+        self.draw_chart_text.text_style.font_size = 9.0;
+        for (i, label) in chart.labels.iter().enumerate() {
+            let x = origin.x + left_margin + i as f64 * cell_w + cell_w / 2.0 - label.len() as f64 * 2.5;
+            self.draw_chart_text.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(x, origin.y + title_height + 2.0)),
+                ..Walk::fit()
+            }, Align::default(), label);
+        }
+
+        // Row labels
+        for (i, series) in chart.series.iter().enumerate() {
+            let name = series.name.as_deref().unwrap_or("");
+            if !name.is_empty() {
+                let y = origin.y + title_height + top_margin + i as f64 * cell_h + cell_h / 2.0 - 5.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(origin.x + 4.0, y)),
+                    ..Walk::fit()
+                }, Align::default(), name);
+            }
+        }
+
+        // Color scale bar
+        let scale_x = origin.x + chart_width - right_margin + 10.0;
+        let scale_h = plot_h * 0.8;
+        let scale_y = origin.y + title_height + top_margin + (plot_h - scale_h) / 2.0;
+        for step in 0..20 {
+            let t = step as f64 / 19.0;
+            let color = Self::lerp_color(low_color, high_color, t);
+            self.draw_chart_bar.color = color;
+            self.draw_chart_bar.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(scale_x, scale_y + scale_h * (1.0 - t) - scale_h / 20.0)),
+                width: Size::Fixed(12.0), height: Size::Fixed(scale_h / 20.0 + 1.0), ..Walk::default()
+            });
+        }
+        self.draw_chart_text.text_style.font_size = 8.0;
+        self.draw_chart_text.draw_walk(cx, Walk { abs_pos: Some(dvec2(scale_x + 14.0, scale_y - 4.0)), ..Walk::fit() }, Align::default(), &format!("{:.0}", v_max));
+        self.draw_chart_text.draw_walk(cx, Walk { abs_pos: Some(dvec2(scale_x + 14.0, scale_y + scale_h - 4.0)), ..Walk::fit() }, Align::default(), &format!("{:.0}", v_min));
+
+        cx.end_turtle();
+    }
+
+    // ========================================================================
+    // TREEMAP CHART
+    // ========================================================================
+    fn render_treemap_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        cx.begin_turtle(walk, Layout::default());
+        let origin = cx.turtle().pos();
+
+        let mut title_height = 0.0;
+        if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                }, Align::default(), &title);
+                title_height = 24.0;
+            }
+        }
+
+        // Handle two data formats:
+        // Format 1: labels=["A","B",...], series=[{values:[10,20,...]}]
+        // Format 2: labels=[], series=[{name:"A",values:[10]},{name:"B",values:[20]},...]
+        let (tm_labels, tm_values): (Vec<String>, Vec<f64>) = if !chart.labels.is_empty() && chart.series.len() == 1 {
+            // Format 1: standard
+            let vals = &chart.series[0].values;
+            let n = vals.len().min(chart.labels.len());
+            (chart.labels[..n].to_vec(), vals[..n].to_vec())
+        } else if chart.labels.is_empty() && chart.series.len() > 1 {
+            // Format 2: each series is one category
+            chart.series.iter().map(|s| {
+                let name = s.name.clone().unwrap_or_default();
+                let val = s.values.first().copied().unwrap_or(0.0);
+                (name, val)
+            }).unzip()
+        } else if !chart.labels.is_empty() {
+            // Fallback: labels + first series
+            let vals = chart.series.first().map(|s| &s.values[..]).unwrap_or(&[]);
+            let n = vals.len().min(chart.labels.len());
+            (chart.labels[..n].to_vec(), vals[..n].to_vec())
+        } else {
+            (vec![], vec![])
+        };
+        let n = tm_labels.len().min(tm_values.len());
+        if n == 0 { cx.end_turtle(); return; }
+
+        // Build sorted index list by value (descending)
+        let mut items: Vec<(usize, f64)> = (0..n).map(|i| (i, tm_values[i])).collect();
+        items.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        let plot_x = origin.x + 4.0;
+        let plot_y = origin.y + title_height + 4.0;
+        let plot_w = chart_width - 8.0;
+        let plot_h = chart_height - title_height - 8.0;
+
+        // Squarified treemap via recursive binary split
+        struct Rect { x: f64, y: f64, w: f64, h: f64 }
+        fn layout_treemap(items: &[(usize, f64)], rect: Rect, result: &mut Vec<(usize, Rect)>) {
+            if items.is_empty() { return; }
+            if items.len() == 1 {
+                result.push((items[0].0, rect));
+                return;
+            }
+            let total: f64 = items.iter().map(|x| x.1).sum();
+            if total <= 0.0 { return; }
+            let mut cumul = 0.0;
+            let mut split = 1;
+            for i in 0..items.len() {
+                cumul += items[i].1;
+                if cumul >= total * 0.5 { split = i + 1; break; }
+            }
+            split = split.max(1).min(items.len() - 1);
+            let ratio = cumul / total;
+
+            if rect.w >= rect.h {
+                let left = Rect { x: rect.x, y: rect.y, w: rect.w * ratio, h: rect.h };
+                let right = Rect { x: rect.x + rect.w * ratio, y: rect.y, w: rect.w * (1.0 - ratio), h: rect.h };
+                layout_treemap(&items[..split], left, result);
+                layout_treemap(&items[split..], right, result);
+            } else {
+                let top = Rect { x: rect.x, y: rect.y, w: rect.w, h: rect.h * ratio };
+                let bottom = Rect { x: rect.x, y: rect.y + rect.h * ratio, w: rect.w, h: rect.h * (1.0 - ratio) };
+                layout_treemap(&items[..split], top, result);
+                layout_treemap(&items[split..], bottom, result);
+            }
+        }
+
+        let mut rects = Vec::new();
+        layout_treemap(&items, Rect { x: plot_x, y: plot_y, w: plot_w, h: plot_h }, &mut rects);
+
+        for (idx, rect) in &rects {
+            let color = self.get_chart_color(chart, *idx);
+            // Cell
+            self.draw_chart_bar.color = color;
+            self.draw_chart_bar.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(rect.x + 1.5, rect.y + 1.5)),
+                width: Size::Fixed((rect.w - 3.0).max(0.0)), height: Size::Fixed((rect.h - 3.0).max(0.0)), ..Walk::default()
+            });
+            // Border
+            self.draw_chart_axis.color = Vec4 { x: 0.1, y: 0.1, z: 0.15, w: 1.0 };
+            // top
+            self.draw_chart_axis.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(rect.x, rect.y)),
+                width: Size::Fixed(rect.w), height: Size::Fixed(1.0), ..Walk::default()
+            });
+            // left
+            self.draw_chart_axis.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(rect.x, rect.y)),
+                width: Size::Fixed(1.0), height: Size::Fixed(rect.h), ..Walk::default()
+            });
+            self.draw_chart_axis.color = Vec4 { x: 0.333, y: 0.4, z: 0.533, w: 1.0 };
+
+            // Label inside (if large enough)
+            if rect.w > 45.0 && rect.h > 28.0 {
+                let label = &tm_labels[*idx];
+                self.draw_chart_text.text_style.font_size = 10.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(rect.x + 6.0, rect.y + 6.0)),
+                    ..Walk::fit()
+                }, Align::default(), label);
+                // Value
+                let vstr = format!("{:.0}", tm_values[*idx]);
+                self.draw_chart_text.text_style.font_size = 9.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(rect.x + 6.0, rect.y + 20.0)),
+                    ..Walk::fit()
+                }, Align::default(), &vstr);
+            } else if rect.w > 20.0 && rect.h > 16.0 {
+                // Just label
+                let label = &tm_labels[*idx];
+                self.draw_chart_text.text_style.font_size = 8.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(rect.x + 3.0, rect.y + 3.0)),
+                    ..Walk::fit()
+                }, Align::default(), label);
+            }
+        }
+
+        cx.end_turtle();
+    }
+
+    // ─── Chord diagram ────────────────────────────────────────────
+    // Data convention:
+    //   labels: entity names (["A", "B", "C", "D"])
+    //   series: flow matrix rows — series[i].values[j] = flow from i to j
+    fn render_chord_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        cx.begin_turtle(walk, Layout::default());
+        let origin = cx.turtle().pos();
+
+        let mut title_height = 0.0;
+        if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                }, Align::default(), &title);
+                title_height = 24.0;
+            }
+        }
+
+        let n = chart.labels.len().min(chart.series.len());
+        if n < 2 { cx.end_turtle(); return; }
+
+        // Compute row sums for arc sizing
+        let mut row_sums: Vec<f64> = vec![0.0; n];
+        for i in 0..n {
+            let vals = &chart.series[i].values;
+            for j in 0..n.min(vals.len()) {
+                row_sums[i] += vals[j];
+            }
+        }
+        let grand_total: f64 = row_sums.iter().sum();
+        if grand_total <= 0.0 { cx.end_turtle(); return; }
+
+        let center_x = origin.x + chart_width / 2.0;
+        let center_y = origin.y + title_height + (chart_height - title_height) / 2.0;
+        let radius = ((chart_width.min(chart_height - title_height)) / 2.0 - 40.0).max(30.0);
+        let inner_frac = 0.85; // inner_radius as fraction of outer
+        let gap_angle = 0.04_f64; // radians gap between arcs
+        let total_gap = gap_angle * n as f64;
+        let available = std::f64::consts::TAU - total_gap;
+        let pi = std::f64::consts::PI;
+
+        // Compute arc start/end angles (starting at -PI/2 = 12 o'clock)
+        let mut arc_starts: Vec<f64> = vec![0.0; n];
+        let mut arc_ends: Vec<f64> = vec![0.0; n];
+        let mut angle = -pi / 2.0;
+        for i in 0..n {
+            arc_starts[i] = angle;
+            let span = (row_sums[i] / grand_total) * available;
+            arc_ends[i] = angle + span;
+            angle += span + gap_angle;
+        }
+
+        // Draw outer arcs using DrawA2uiArc (proper GPU arc shader)
+        let arc_size = radius * 2.0 + 4.0;
+        for i in 0..n {
+            self.draw_chart_arc.color = self.get_chart_color(chart, i);
+            self.draw_chart_arc.start_angle = arc_starts[i] as f32;
+            self.draw_chart_arc.end_angle = arc_ends[i] as f32;
+            self.draw_chart_arc.inner_radius = inner_frac as f32;
+            self.draw_chart_arc.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(center_x - radius, center_y - radius)),
+                width: Size::Fixed(arc_size),
+                height: Size::Fixed(arc_size),
+                ..Walk::default()
+            });
+        }
+
+        // Draw chord ribbons using DrawA2uiQuad (proper quadrilateral shader)
+        let inner_r = radius * inner_frac;
+        for i in 0..n {
+            let vals = &chart.series[i].values;
+            let mut src_angle_cursor = arc_starts[i];
+            for j in 0..n.min(vals.len()) {
+                let flow = vals[j];
+                if flow <= 0.0 || i == j {
+                    let span = (flow / grand_total) * available;
+                    src_angle_cursor += span;
+                    continue;
+                }
+                let src_span = (flow / grand_total) * available;
+                let src_a0 = src_angle_cursor;
+                let src_a1 = src_angle_cursor + src_span;
+                src_angle_cursor += src_span;
+
+                // Target position on target arc
+                let dst_mid = (arc_starts[j] + arc_ends[j]) / 2.0;
+                let dst_half = src_span * 0.5;
+                let dst_a0 = dst_mid - dst_half;
+                let dst_a1 = dst_mid + dst_half;
+
+                let color = self.get_chart_color(chart, i);
+                let mut fill_color = color;
+                fill_color.w = 0.35;
+
+                // Boundary curves: top (src_a0→dst_a0) and bottom (src_a1→dst_a1)
+                // Both are quadratic beziers with control point at center
+                let s0x = center_x + inner_r * src_a0.cos();
+                let s0y = center_y + inner_r * src_a0.sin();
+                let s1x = center_x + inner_r * src_a1.cos();
+                let s1y = center_y + inner_r * src_a1.sin();
+                let d0x = center_x + inner_r * dst_a0.cos();
+                let d0y = center_y + inner_r * dst_a0.sin();
+                let d1x = center_x + inner_r * dst_a1.cos();
+                let d1y = center_y + inner_r * dst_a1.sin();
+
+                // Helper: evaluate quadratic bezier at t
+                #[inline]
+                fn qbez(t: f64, p0: f64, p1: f64, p2: f64) -> f64 {
+                    let u = 1.0 - t;
+                    u * u * p0 + 2.0 * u * t * p1 + t * t * p2
+                }
+
+                // Render ribbon fill as a strip of proper quadrilaterals
+                let t_steps = 64;
+                let pad = 2.0;
+                for step in 0..t_steps {
+                    let t = step as f64 / t_steps as f64;
+                    let t_next = (step + 1) as f64 / t_steps as f64;
+
+                    let tx0 = qbez(t, s0x, center_x, d0x);
+                    let ty0 = qbez(t, s0y, center_y, d0y);
+                    let tx1 = qbez(t_next, s0x, center_x, d0x);
+                    let ty1 = qbez(t_next, s0y, center_y, d0y);
+
+                    let bx0 = qbez(t, s1x, center_x, d1x);
+                    let by0 = qbez(t, s1y, center_y, d1y);
+                    let bx1 = qbez(t_next, s1x, center_x, d1x);
+                    let by1 = qbez(t_next, s1y, center_y, d1y);
+
+                    let corners = [(tx0, ty0), (tx1, ty1), (bx1, by1), (bx0, by0)];
+                    let min_x = corners.iter().map(|c| c.0).fold(f64::MAX, f64::min) - pad;
+                    let max_x = corners.iter().map(|c| c.0).fold(f64::MIN, f64::max) + pad;
+                    let min_y = corners.iter().map(|c| c.1).fold(f64::MAX, f64::min) - pad;
+                    let max_y = corners.iter().map(|c| c.1).fold(f64::MIN, f64::max) + pad;
+                    let w = (max_x - min_x).max(1.0);
+                    let h = (max_y - min_y).max(1.0);
+
+                    self.draw_chart_quad.color = fill_color;
+                    self.draw_chart_quad.opacity = 0.4;
+                    self.draw_chart_quad.p0x = (tx0 - min_x) as f32;
+                    self.draw_chart_quad.p0y = (ty0 - min_y) as f32;
+                    self.draw_chart_quad.p1x = (tx1 - min_x) as f32;
+                    self.draw_chart_quad.p1y = (ty1 - min_y) as f32;
+                    self.draw_chart_quad.p2x = (bx1 - min_x) as f32;
+                    self.draw_chart_quad.p2y = (by1 - min_y) as f32;
+                    self.draw_chart_quad.p3x = (bx0 - min_x) as f32;
+                    self.draw_chart_quad.p3y = (by0 - min_y) as f32;
+                    self.draw_chart_quad.draw_walk(cx, Walk {
+                        abs_pos: Some(dvec2(min_x, min_y)),
+                        width: Size::Fixed(w),
+                        height: Size::Fixed(h),
+                        ..Walk::default()
+                    });
+                }
+
+                // Draw smooth anti-aliased boundary curves on top
+                let border_color = Vec4 { x: color.x, y: color.y, z: color.z, w: 0.6 };
+                let edge_steps = 48;
+                for step in 0..edge_steps {
+                    let t = step as f64 / edge_steps as f64;
+                    let t_next = (step + 1) as f64 / edge_steps as f64;
+
+                    // Top boundary line segments
+                    let ax0 = qbez(t, s0x, center_x, d0x);
+                    let ay0 = qbez(t, s0y, center_y, d0y);
+                    let ax1 = qbez(t_next, s0x, center_x, d0x);
+                    let ay1 = qbez(t_next, s0y, center_y, d0y);
+
+                    let seg_w = ((ax1 - ax0).abs() + 2.0).max(3.0);
+                    let seg_h = ((ay1 - ay0).abs() + 2.0).max(3.0);
+                    let seg_x = ax0.min(ax1) - 1.0;
+                    let seg_y = ay0.min(ay1) - 1.0;
+
+                    self.draw_chart_line.color = border_color;
+                    self.draw_chart_line.line_width = 0.08;
+                    self.draw_chart_line.x1 = ((ax0 - seg_x) / seg_w) as f32;
+                    self.draw_chart_line.y1 = ((ay0 - seg_y) / seg_h) as f32;
+                    self.draw_chart_line.x2 = ((ax1 - seg_x) / seg_w) as f32;
+                    self.draw_chart_line.y2 = ((ay1 - seg_y) / seg_h) as f32;
+                    self.draw_chart_line.draw_walk(cx, Walk {
+                        abs_pos: Some(dvec2(seg_x, seg_y)),
+                        width: Size::Fixed(seg_w),
+                        height: Size::Fixed(seg_h),
+                        ..Walk::default()
+                    });
+
+                    // Bottom boundary line segments
+                    let bx0l = qbez(t, s1x, center_x, d1x);
+                    let by0l = qbez(t, s1y, center_y, d1y);
+                    let bx1l = qbez(t_next, s1x, center_x, d1x);
+                    let by1l = qbez(t_next, s1y, center_y, d1y);
+
+                    let seg_w2 = ((bx1l - bx0l).abs() + 2.0).max(3.0);
+                    let seg_h2 = ((by1l - by0l).abs() + 2.0).max(3.0);
+                    let seg_x2 = bx0l.min(bx1l) - 1.0;
+                    let seg_y2 = by0l.min(by1l) - 1.0;
+
+                    self.draw_chart_line.x1 = ((bx0l - seg_x2) / seg_w2) as f32;
+                    self.draw_chart_line.y1 = ((by0l - seg_y2) / seg_h2) as f32;
+                    self.draw_chart_line.x2 = ((bx1l - seg_x2) / seg_w2) as f32;
+                    self.draw_chart_line.y2 = ((by1l - seg_y2) / seg_h2) as f32;
+                    self.draw_chart_line.draw_walk(cx, Walk {
+                        abs_pos: Some(dvec2(seg_x2, seg_y2)),
+                        width: Size::Fixed(seg_w2),
+                        height: Size::Fixed(seg_h2),
+                        ..Walk::default()
+                    });
+                }
+            }
+        }
+
+        // Draw entity labels around the outside
+        for i in 0..n {
+            let mid_angle = (arc_starts[i] + arc_ends[i]) / 2.0;
+            let label_r = radius + 18.0;
+            let lx = center_x + label_r * mid_angle.cos();
+            let ly = center_y + label_r * mid_angle.sin();
+            let label = &chart.labels[i];
+            self.draw_chart_text.text_style.font_size = 10.0;
+            self.draw_chart_text.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(lx - label.len() as f64 * 3.0, ly - 5.0)),
+                ..Walk::fit()
+            }, Align::default(), label);
+        }
+
+        cx.end_turtle();
+    }
+
+    // ─── Sankey diagram ───────────────────────────────────────────
+    // Data convention:
+    //   labels: node names (["Source A", "Source B", "Process", "Output X", "Output Y"])
+    //   series[0]: {"name": "sources", "values": [0, 0, 1, 2, 2]}  (source node indices)
+    //   series[1]: {"name": "targets", "values": [2, 3, 2, 3, 4]}  (target node indices)
+    //   series[2]: {"name": "values",  "values": [8, 4, 6, 10, 8]} (flow magnitudes)
+    fn render_sankey_chart(
+        &mut self,
+        cx: &mut Cx2d,
+        chart: &ChartComponent,
+        data_model: &DataModel,
+    ) {
+        let chart_width = chart.width;
+        let chart_height = chart.height;
+
+        let walk = Walk::new(Size::Fixed(chart_width), Size::Fixed(chart_height));
+        cx.begin_turtle(walk, Layout::default());
+        let origin = cx.turtle().pos();
+
+        let mut title_height = 0.0;
+        if let Some(ref title_val) = chart.title {
+            let title = resolve_string_value_scoped(title_val, data_model, self.current_scope.as_deref());
+            if !title.is_empty() {
+                self.draw_chart_text.text_style.font_size = 14.0;
+                self.draw_chart_text.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    ..Walk::fit()
+                }, Align::default(), &title);
+                title_height = 24.0;
+            }
+        }
+
+        if chart.series.len() < 3 || chart.labels.is_empty() {
+            cx.end_turtle();
+            return;
+        }
+
+        let sources = &chart.series[0].values;
+        let targets = &chart.series[1].values;
+        let flow_values = &chart.series[2].values;
+        let link_count = sources.len().min(targets.len()).min(flow_values.len());
+        let node_count = chart.labels.len();
+        if link_count == 0 || node_count == 0 { cx.end_turtle(); return; }
+
+        // Assign layers via iterative longest-path
+        let mut layers: Vec<usize> = vec![0; node_count];
+        for _ in 0..node_count {
+            for k in 0..link_count {
+                let s = sources[k] as usize;
+                let t = targets[k] as usize;
+                if s < node_count && t < node_count && layers[t] <= layers[s] {
+                    layers[t] = layers[s] + 1;
+                }
+            }
+        }
+        let max_layer = *layers.iter().max().unwrap_or(&0);
+        if max_layer == 0 && node_count > 1 { cx.end_turtle(); return; }
+
+        let plot_x = origin.x + 70.0;
+        let plot_y = origin.y + title_height + 10.0;
+        let plot_w = chart_width - 140.0;
+        let plot_h = chart_height - title_height - 20.0;
+
+        let layer_count = max_layer + 1;
+        let node_width = 16.0;
+        let layer_spacing = if layer_count > 1 {
+            (plot_w - node_width) / (layer_count - 1) as f64
+        } else { plot_w };
+
+        // Compute node throughput (max of incoming/outgoing)
+        let mut node_out: Vec<f64> = vec![0.0; node_count];
+        let mut node_in: Vec<f64> = vec![0.0; node_count];
+        for k in 0..link_count {
+            let s = sources[k] as usize;
+            let t = targets[k] as usize;
+            let v = flow_values[k];
+            if s < node_count { node_out[s] += v; }
+            if t < node_count { node_in[t] += v; }
+        }
+        let mut node_value: Vec<f64> = vec![0.0; node_count];
+        for i in 0..node_count {
+            node_value[i] = node_out[i].max(node_in[i]);
+        }
+
+        // Group nodes by layer and compute positions
+        let mut layer_nodes: Vec<Vec<usize>> = vec![Vec::new(); layer_count];
+        for i in 0..node_count { layer_nodes[layers[i]].push(i); }
+
+        let node_gap = 10.0;
+        let mut node_x: Vec<f64> = vec![0.0; node_count];
+        let mut node_y: Vec<f64> = vec![0.0; node_count];
+        let mut node_h: Vec<f64> = vec![0.0; node_count];
+
+        for l in 0..layer_count {
+            let nodes = &layer_nodes[l];
+            let total_value: f64 = nodes.iter().map(|&i| node_value[i]).sum();
+            let total_gaps = if nodes.len() > 1 { (nodes.len() - 1) as f64 * node_gap } else { 0.0 };
+            let available_h = (plot_h - total_gaps).max(10.0);
+            let scale = if total_value > 0.0 { available_h / total_value } else { 1.0 };
+
+            // Center the layer vertically
+            let used_h: f64 = nodes.iter().map(|&i| (node_value[i] * scale).max(4.0)).sum::<f64>()
+                + total_gaps;
+            let mut y_cursor = plot_y + (plot_h - used_h) / 2.0;
+
+            for &i in nodes {
+                let h = (node_value[i] * scale).max(4.0);
+                node_x[i] = plot_x + l as f64 * layer_spacing;
+                node_y[i] = y_cursor;
+                node_h[i] = h;
+                y_cursor += h + node_gap;
+            }
+        }
+
+        // Draw flow links first (behind nodes)
+        let mut src_port: Vec<f64> = vec![0.0; node_count];
+        let mut dst_port: Vec<f64> = vec![0.0; node_count];
+
+        for k in 0..link_count {
+            let s = sources[k] as usize;
+            let t = targets[k] as usize;
+            let v = flow_values[k];
+            if s >= node_count || t >= node_count { continue; }
+
+            let src_scale = if node_value[s] > 0.0 { node_h[s] / node_value[s] } else { 1.0 };
+            let dst_scale = if node_value[t] > 0.0 { node_h[t] / node_value[t] } else { 1.0 };
+            let band_h_src = v * src_scale;
+            let band_h_dst = v * dst_scale;
+
+            let x0 = node_x[s] + node_width;
+            let y0_top = node_y[s] + src_port[s];
+            let x1 = node_x[t];
+            let y1_top = node_y[t] + dst_port[t];
+
+            src_port[s] += band_h_src;
+            dst_port[t] += band_h_dst;
+
+            let color = self.get_chart_color(chart, s);
+            let mut band_color = color;
+            band_color.w = 0.45;
+
+            // Draw S-curved band using proper quadrilateral strips
+            let steps = 32;
+            let pad = 1.5;
+            for step in 0..steps {
+                let t0 = step as f64 / steps as f64;
+                let t1 = (step + 1) as f64 / steps as f64;
+
+                // Hermite ease for smooth S-curve
+                let ease0 = t0 * t0 * (3.0 - 2.0 * t0);
+                let ease1 = t1 * t1 * (3.0 - 2.0 * t1);
+
+                let xl = x0 + (x1 - x0) * t0;
+                let xr = x0 + (x1 - x0) * t1;
+                let yt_l = y0_top + (y1_top - y0_top) * ease0;
+                let yt_r = y0_top + (y1_top - y0_top) * ease1;
+                let h_l = band_h_src + (band_h_dst - band_h_src) * ease0;
+                let h_r = band_h_src + (band_h_dst - band_h_src) * ease1;
+                let yb_l = yt_l + h_l;
+                let yb_r = yt_r + h_r;
+
+                // Quad corners: TL → TR → BR → BL
+                let corners = [(xl, yt_l), (xr, yt_r), (xr, yb_r), (xl, yb_l)];
+                let min_x = corners.iter().map(|c| c.0).fold(f64::MAX, f64::min) - pad;
+                let max_x = corners.iter().map(|c| c.0).fold(f64::MIN, f64::max) + pad;
+                let min_y = corners.iter().map(|c| c.1).fold(f64::MAX, f64::min) - pad;
+                let max_y = corners.iter().map(|c| c.1).fold(f64::MIN, f64::max) + pad;
+                let w = (max_x - min_x).max(1.0);
+                let h = (max_y - min_y).max(1.0);
+
+                self.draw_chart_quad.color = band_color;
+                self.draw_chart_quad.opacity = 0.55;
+                self.draw_chart_quad.p0x = (xl - min_x) as f32;
+                self.draw_chart_quad.p0y = (yt_l - min_y) as f32;
+                self.draw_chart_quad.p1x = (xr - min_x) as f32;
+                self.draw_chart_quad.p1y = (yt_r - min_y) as f32;
+                self.draw_chart_quad.p2x = (xr - min_x) as f32;
+                self.draw_chart_quad.p2y = (yb_r - min_y) as f32;
+                self.draw_chart_quad.p3x = (xl - min_x) as f32;
+                self.draw_chart_quad.p3y = (yb_l - min_y) as f32;
+                self.draw_chart_quad.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(min_x, min_y)),
+                    width: Size::Fixed(w),
+                    height: Size::Fixed(h),
+                    ..Walk::default()
+                });
+            }
+        }
+
+        // Draw nodes (rectangles) on top of links
+        for i in 0..node_count {
+            if node_value[i] <= 0.0 { continue; }
+            let color = self.get_chart_color(chart, i);
+            self.draw_chart_bar.color = color;
+            self.draw_chart_bar.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(node_x[i], node_y[i])),
+                width: Size::Fixed(node_width),
+                height: Size::Fixed(node_h[i]),
+                ..Walk::default()
+            });
+
+            // Node label
+            let label = &chart.labels[i];
+            self.draw_chart_text.text_style.font_size = 9.0;
+            let lx = if layers[i] == 0 {
+                node_x[i] - label.len() as f64 * 5.0 - 6.0
+            } else {
+                node_x[i] + node_width + 6.0
+            };
+            let ly = node_y[i] + node_h[i] / 2.0 - 5.0;
+            self.draw_chart_text.draw_walk(cx, Walk {
+                abs_pos: Some(dvec2(lx, ly)),
+                ..Walk::fit()
+            }, Align::default(), label);
+        }
 
         cx.end_turtle();
     }
