@@ -141,6 +141,9 @@ pub struct App {
 
     #[rust]
     last_content_hash: u64,
+
+    #[rust]
+    poll_timer: Timer,
 }
 
 impl LiveRegister for App {
@@ -337,34 +340,49 @@ impl App {
             return;
         }
 
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
-        let mut needs_redraw = false;
+        // Collect all messages first, then hash the batch to detect duplicates
+        let mut messages: Vec<A2uiMessage> = Vec::new();
+        let mut had_error = false;
+        let mut error_msg = String::new();
+        let mut had_disconnect = false;
+        let mut task_state = None;
 
         for event in events {
             match event {
-                A2uiHostEvent::Connected => {
-                    if self.live_mode {
-                        self.ui.label(ids!(status_label)).set_text(cx, "🎨 Connected to live server...");
-                    } else {
-                        self.ui.label(ids!(status_label)).set_text(cx, "💳 Connected! Loading payment page...");
-                    }
-                    needs_redraw = true;
-                }
+                A2uiHostEvent::Connected => {}
                 A2uiHostEvent::Message(msg) => {
-                    // Compute hash of message content to detect duplicates
-                    let content_hash = {
-                        let mut hasher = DefaultHasher::new();
-                        format!("{:?}", msg).hash(&mut hasher);
-                        hasher.finish()
-                    };
+                    messages.push(msg);
+                }
+                A2uiHostEvent::TaskStatus { task_id: _, state } => {
+                    task_state = Some(state);
+                }
+                A2uiHostEvent::Error(e) => {
+                    had_error = true;
+                    error_msg = e;
+                }
+                A2uiHostEvent::Disconnected => {
+                    had_disconnect = true;
+                }
+            }
+        }
 
-                    // Skip if content hasn't changed
-                    if content_hash == self.last_content_hash {
-                        log!("Skipping duplicate content (hash: {})", content_hash);
-                        continue;
-                    }
-                    self.last_content_hash = content_hash;
+        // Hash the entire batch of messages to detect duplicates across reconnections
+        let mut needs_redraw = false;
 
+        if !messages.is_empty() {
+            let batch_hash = {
+                let mut hasher = DefaultHasher::new();
+                for msg in &messages {
+                    format!("{:?}", msg).hash(&mut hasher);
+                }
+                hasher.finish()
+            };
+
+            if batch_hash != self.last_content_hash {
+                self.last_content_hash = batch_hash;
+
+                let surface_ref = self.ui.widget(ids!(a2ui_surface));
+                for msg in messages {
                     log!("Received A2uiMessage: {:?}", msg);
                     if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
                         let events = surface.process_message(msg);
@@ -372,42 +390,44 @@ impl App {
                         for event in &events {
                             log!("  Event: {:?}", event);
                         }
-                    } else {
-                        log!("ERROR: Could not borrow A2uiSurface!");
                     }
-                    if self.live_mode {
-                        self.ui.label(ids!(status_label)).set_text(cx, "🎨 UI Updated from ui_live.json");
-                    } else {
-                        self.ui.label(ids!(status_label)).set_text(cx, "💳 Streaming payment UI...");
-                    }
-                    needs_redraw = true;
                 }
-                A2uiHostEvent::TaskStatus { task_id: _, state } => {
-                    if state == "completed" {
-                        self.ui.label(ids!(status_label)).set_text(cx, "✅ Payment page ready");
-                    } else {
-                        self.ui.label(ids!(status_label)).set_text(cx, &format!("💳 {}", state));
-                    }
-                    needs_redraw = true;
+                if self.live_mode {
+                    self.ui.label(ids!(status_label)).set_text(cx, "🎨 UI Updated from ui_live.json");
+                    self.loaded = true;
+                    self.poll_timer = Timer::default(); // Stop polling — no data, no refresh
+                } else {
+                    self.ui.label(ids!(status_label)).set_text(cx, "💳 Streaming payment UI...");
                 }
-                A2uiHostEvent::Error(e) => {
-                    self.ui.label(ids!(status_label)).set_text(cx, &format!("❌ Error: {}", e));
-                    needs_redraw = true;
-                }
-                A2uiHostEvent::Disconnected => {
-                    self.host = None;
-                    self.is_streaming = false;
-                    if self.live_mode {
-                        self.ui.label(ids!(status_label)).set_text(cx, "🔄 Live mode - watching for changes...");
-                    } else {
-                        self.ui.label(ids!(status_label)).set_text(cx, "⚫ Disconnected from server");
-                    }
-                    needs_redraw = true;
-                }
+                needs_redraw = true;
             }
         }
 
-        // Only redraw if content actually changed
+        if let Some(state) = task_state {
+            if !self.live_mode {
+                if state == "completed" {
+                    self.ui.label(ids!(status_label)).set_text(cx, "✅ Payment page ready");
+                } else {
+                    self.ui.label(ids!(status_label)).set_text(cx, &format!("💳 {}", state));
+                }
+                needs_redraw = true;
+            }
+        }
+
+        if had_error {
+            self.ui.label(ids!(status_label)).set_text(cx, &format!("❌ Error: {}", error_msg));
+            needs_redraw = true;
+        }
+
+        if had_disconnect {
+            self.host = None;
+            self.is_streaming = false;
+            if !self.live_mode {
+                self.ui.label(ids!(status_label)).set_text(cx, "⚫ Disconnected from server");
+                needs_redraw = true;
+            }
+        }
+
         if needs_redraw {
             self.ui.redraw(cx);
         }
@@ -474,25 +494,18 @@ impl AppMain for App {
         // Auto-connect to live server on startup
         if let Event::Startup = event {
             self.connect_to_server(cx);
+            // Start interval timer for polling instead of continuous frame requests
+            self.poll_timer = cx.start_interval(1.0);
         }
 
-        // Poll for streaming messages when connected
-        if self.host.is_some() {
-            self.poll_host(cx);
-        }
-
-        // Live mode: keep the event loop running for polling
-        if self.live_mode {
-            if self.host.is_none() {
-                // Reconnect periodically to get updates
-                let current_time = cx.seconds_since_app_start();
-                if current_time - self.last_poll_time > 1.0 {
-                    self.last_poll_time = current_time;
-                    self.reconnect_live(cx);
-                }
+        // Only poll on timer ticks — no polling on mouse/keyboard/paint events
+        if self.poll_timer.is_event(event).is_some() {
+            if self.host.is_some() {
+                self.poll_host(cx);
+            } else if self.live_mode && !self.loaded {
+                // Only reconnect if we haven't loaded data yet
+                self.reconnect_live(cx);
             }
-            // Always request next frame to keep polling loop active
-            cx.new_next_frame();
         }
 
         // Capture actions from UI event handling

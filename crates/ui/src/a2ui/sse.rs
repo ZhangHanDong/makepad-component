@@ -6,9 +6,10 @@
 //! - Lines starting with ":" are comments (keep-alive pings)
 //! - Empty lines mark message boundaries
 
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
+use std::time::Duration;
 
 /// SSE event parsed from stream
 #[derive(Debug, Clone)]
@@ -128,8 +129,12 @@ impl SseClient {
         body: &str,
         tx: &Sender<SseEvent>,
     ) -> Result<(), String> {
-        // Build request
-        let mut request = ureq::post(url)
+        // Build agent with read timeout to prevent thread leak on persistent connections
+        let agent = ureq::AgentBuilder::new()
+            .timeout_read(Duration::from_secs(10))
+            .build();
+
+        let mut request = agent.post(url)
             .set("Content-Type", "application/json")
             .set("Accept", "text/event-stream");
 

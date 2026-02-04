@@ -2563,23 +2563,26 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 let title_walk = Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 };
                 self.draw_chart_text.draw_walk(cx, title_walk, Align::default(), &title);
             }
         }
 
-        // Find data range
+        // Find data range (support negative values)
+        let mut min_val: f64 = 0.0;
         let mut max_val: f64 = 0.0;
         for series in &chart.series {
             for &v in &series.values {
                 if v > max_val { max_val = v; }
+                if v < min_val { min_val = v; }
             }
         }
-        if max_val == 0.0 { max_val = 1.0; }
-        // Nice rounding
+        if max_val == 0.0 && min_val == 0.0 { max_val = 1.0; }
         let nice_max = Self::nice_number(max_val);
+        let nice_min = if min_val < 0.0 { -Self::nice_number(-min_val) } else { 0.0 };
+        let y_range = (nice_max - nice_min).max(1.0);
 
         let label_count = chart.labels.len();
         let series_count = chart.series.len().max(1);
@@ -2602,9 +2605,10 @@ impl A2uiSurface {
             ..Walk::default()
         });
 
-        // Draw X-axis line
+        // Draw X-axis line at zero (or bottom if all positive)
+        let zero_y = origin.y + padding_top + plot_height * (1.0 - (0.0 - nice_min) / y_range);
         self.draw_chart_axis.draw_walk(cx, Walk {
-            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top + plot_height)),
+            abs_pos: Some(dvec2(origin.x + padding_left, zero_y)),
             width: Size::Fixed(plot_width),
             height: Size::Fixed(1.0),
             ..Walk::default()
@@ -2614,9 +2618,10 @@ impl A2uiSurface {
         let tick_count = 5;
         self.draw_chart_text.text_style.font_size = 9.0;
         for i in 0..=tick_count {
-            let val = nice_max * i as f64 / tick_count as f64;
-            let y = origin.y + padding_top + plot_height - (plot_height * val / nice_max);
-            let label = if val >= 1000.0 {
+            let frac = i as f64 / tick_count as f64;
+            let val = nice_min + y_range * frac;
+            let y = origin.y + padding_top + plot_height * (1.0 - frac);
+            let label = if val.abs() >= 1000.0 {
                 format!("{:.0}k", val / 1000.0)
             } else if val == val.floor() {
                 format!("{:.0}", val)
@@ -2640,34 +2645,40 @@ impl A2uiSurface {
             }
         }
 
-        // Draw bars
+        // Draw bars (support negative values — bars extend from zero line)
+        let label_skip = Self::label_skip_interval(label_count, plot_width, 9.0);
         for (label_idx, _label) in chart.labels.iter().enumerate() {
             let group_x = origin.x + padding_left + label_idx as f64 * group_width;
 
             for (series_idx, series) in chart.series.iter().enumerate() {
                 let val = series.values.get(label_idx).copied().unwrap_or(0.0);
-                let bar_height = (val / nice_max) * plot_height;
-
+                let val_y = origin.y + padding_top + plot_height * (1.0 - (val - nice_min) / y_range);
                 let bar_x = group_x + bar_spacing + series_idx as f64 * (bar_width + bar_spacing);
-                let bar_y = origin.y + padding_top + plot_height - bar_height;
+
+                // Bar extends from zero line to value
+                let bar_top = val_y.min(zero_y);
+                let bar_bottom = val_y.max(zero_y);
+                let bar_height = (bar_bottom - bar_top).max(1.0);
 
                 self.draw_chart_bar.color = self.get_chart_color(chart, series_idx);
                 self.draw_chart_bar.draw_walk(cx, Walk {
-                    abs_pos: Some(dvec2(bar_x, bar_y)),
+                    abs_pos: Some(dvec2(bar_x, bar_top)),
                     width: Size::Fixed(bar_width),
-                    height: Size::Fixed(bar_height.max(1.0)),
+                    height: Size::Fixed(bar_height),
                     ..Walk::default()
                 });
             }
 
-            // X-axis label
-            let label_text = &chart.labels[label_idx];
-            let label_x = group_x + group_width / 2.0 - label_text.len() as f64 * 2.5;
-            let label_walk = Walk {
-                abs_pos: Some(dvec2(label_x, origin.y + padding_top + plot_height + 6.0)),
-                ..Walk::fit()
-            };
-            self.draw_chart_text.draw_walk(cx, label_walk, Align::default(), label_text);
+            // X-axis label (decimated to prevent overlap)
+            if label_idx % label_skip == 0 || label_idx == label_count - 1 {
+                let label_text = &chart.labels[label_idx];
+                let label_x = group_x + group_width / 2.0 - Self::estimate_text_width(label_text, 9.0) / 2.0;
+                let label_walk = Walk {
+                    abs_pos: Some(dvec2(label_x, origin.y + padding_top + plot_height + 6.0)),
+                    ..Walk::fit()
+                };
+                self.draw_chart_text.draw_walk(cx, label_walk, Align::default(), label_text);
+            }
         }
 
         // Legend
@@ -2728,22 +2739,26 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 let title_walk = Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 };
                 self.draw_chart_text.draw_walk(cx, title_walk, Align::default(), &title);
             }
         }
 
-        // Find data range
+        // Find data range (support negative values)
+        let mut min_val: f64 = 0.0;
         let mut max_val: f64 = 0.0;
         for series in &chart.series {
             for &v in &series.values {
                 if v > max_val { max_val = v; }
+                if v < min_val { min_val = v; }
             }
         }
-        if max_val == 0.0 { max_val = 1.0; }
+        if max_val == 0.0 && min_val == 0.0 { max_val = 1.0; }
         let nice_max = Self::nice_number(max_val);
+        let nice_min = if min_val < 0.0 { -Self::nice_number(-min_val) } else { 0.0 };
+        let y_range = (nice_max - nice_min).max(1.0);
 
         let point_count = chart.labels.len();
         if point_count == 0 {
@@ -2758,8 +2773,10 @@ impl A2uiSurface {
             height: Size::Fixed(plot_height),
             ..Walk::default()
         });
+        // X-axis at zero (or bottom if all positive)
+        let zero_y = origin.y + padding_top + plot_height * (1.0 - (0.0 - nice_min) / y_range);
         self.draw_chart_axis.draw_walk(cx, Walk {
-            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top + plot_height)),
+            abs_pos: Some(dvec2(origin.x + padding_left, zero_y)),
             width: Size::Fixed(plot_width),
             height: Size::Fixed(1.0),
             ..Walk::default()
@@ -2769,9 +2786,10 @@ impl A2uiSurface {
         let tick_count = 5;
         self.draw_chart_text.text_style.font_size = 9.0;
         for i in 0..=tick_count {
-            let val = nice_max * i as f64 / tick_count as f64;
-            let y = origin.y + padding_top + plot_height - (plot_height * val / nice_max);
-            let label = if val >= 1000.0 {
+            let frac = i as f64 / tick_count as f64;
+            let val = nice_min + y_range * frac;
+            let y = origin.y + padding_top + plot_height * (1.0 - frac);
+            let label = if val.abs() >= 1000.0 {
                 format!("{:.0}k", val / 1000.0)
             } else if val == val.floor() {
                 format!("{:.0}", val)
@@ -2794,12 +2812,14 @@ impl A2uiSurface {
             }
         }
 
-        // X-axis labels
+        // X-axis labels (decimated to prevent overlap)
         let step_x = if point_count > 1 { plot_width / (point_count - 1) as f64 } else { plot_width };
+        let label_skip = Self::label_skip_interval(point_count, plot_width, 9.0);
         for (i, label) in chart.labels.iter().enumerate() {
+            if i % label_skip != 0 && i != point_count - 1 { continue; }
             let x = origin.x + padding_left + i as f64 * step_x;
             let label_walk = Walk {
-                abs_pos: Some(dvec2(x - label.len() as f64 * 2.5, origin.y + padding_top + plot_height + 6.0)),
+                abs_pos: Some(dvec2(x - Self::estimate_text_width(label, 9.0) / 2.0, origin.y + padding_top + plot_height + 6.0)),
                 ..Walk::fit()
             };
             self.draw_chart_text.draw_walk(cx, label_walk, Align::default(), label);
@@ -2814,9 +2834,9 @@ impl A2uiSurface {
                 let v2 = series.values[i + 1];
 
                 let x1_abs = origin.x + padding_left + i as f64 * step_x;
-                let y1_abs = origin.y + padding_top + plot_height - (v1 / nice_max) * plot_height;
+                let y1_abs = origin.y + padding_top + plot_height * (1.0 - (v1 - nice_min) / y_range);
                 let x2_abs = origin.x + padding_left + (i + 1) as f64 * step_x;
-                let y2_abs = origin.y + padding_top + plot_height - (v2 / nice_max) * plot_height;
+                let y2_abs = origin.y + padding_top + plot_height * (1.0 - (v2 - nice_min) / y_range);
 
                 // Bounding box for the line segment
                 let min_x = x1_abs.min(x2_abs) - 4.0;
@@ -2845,7 +2865,7 @@ impl A2uiSurface {
             // Draw data points
             for (i, &val) in series.values.iter().enumerate() {
                 let x = origin.x + padding_left + i as f64 * step_x;
-                let y = origin.y + padding_top + plot_height - (val / nice_max) * plot_height;
+                let y = origin.y + padding_top + plot_height * (1.0 - (val - nice_min) / y_range);
                 let dot_size = 6.0;
 
                 self.draw_chart_bar.color = color;
@@ -2906,7 +2926,7 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 let title_walk = Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 };
                 self.draw_chart_text.draw_walk(cx, title_walk, Align::default(), &title);
@@ -3029,6 +3049,22 @@ impl A2uiSurface {
         (nice_fraction - if nice_fraction > 1.0 { nice_fraction / 2.0 } else { 0.0 }) * magnitude
     }
 
+    /// Estimate text pixel width based on character count and font size
+    fn estimate_text_width(text: &str, font_size: f64) -> f64 {
+        let avg_char_w = font_size * 0.55;
+        text.chars().count() as f64 * avg_char_w
+    }
+
+    /// Compute label skip interval to prevent overlap on dense axes
+    fn label_skip_interval(label_count: usize, plot_width: f64, font_size: f64) -> usize {
+        if label_count == 0 { return 1; }
+        let available_per_label = plot_width / label_count as f64;
+        // Estimate label width as ~6 chars at given font size + 8px gap
+        let min_spacing = font_size * 0.55 * 6.0 + 8.0;
+        if available_per_label >= min_spacing { return 1; }
+        ((min_spacing / available_per_label).ceil() as usize).max(1)
+    }
+
     /// Interpolate between two colors
     fn lerp_color(c1: Vec4, c2: Vec4, t: f64) -> Vec4 {
         let t = t as f32;
@@ -3068,20 +3104,26 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 let title_walk = Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 };
                 self.draw_chart_text.draw_walk(cx, title_walk, Align::default(), &title);
             }
         }
 
-        // Find max value
+        // Find data range (support negative values)
+        let mut min_val: f64 = 0.0;
         let mut max_val: f64 = 0.0;
         for series in &chart.series {
-            for &v in &series.values { if v > max_val { max_val = v; } }
+            for &v in &series.values {
+                if v > max_val { max_val = v; }
+                if v < min_val { min_val = v; }
+            }
         }
-        if max_val == 0.0 { max_val = 1.0; }
+        if max_val == 0.0 && min_val == 0.0 { max_val = 1.0; }
         let nice_max = Self::nice_number(max_val);
+        let nice_min = if min_val < 0.0 { -Self::nice_number(-min_val) } else { 0.0 };
+        let y_range = (nice_max - nice_min).max(1.0);
         let label_count = chart.labels.len();
         if label_count == 0 { cx.end_turtle(); return; }
 
@@ -3090,8 +3132,10 @@ impl A2uiSurface {
             abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top)),
             width: Size::Fixed(1.0), height: Size::Fixed(plot_height), ..Walk::default()
         });
+        // X-axis at zero (or bottom if all positive)
+        let zero_y = origin.y + padding_top + plot_height * (1.0 - (0.0 - nice_min) / y_range);
         self.draw_chart_axis.draw_walk(cx, Walk {
-            abs_pos: Some(dvec2(origin.x + padding_left, origin.y + padding_top + plot_height)),
+            abs_pos: Some(dvec2(origin.x + padding_left, zero_y)),
             width: Size::Fixed(plot_width), height: Size::Fixed(1.0), ..Walk::default()
         });
 
@@ -3100,8 +3144,8 @@ impl A2uiSurface {
         for i in 0..=5 {
             let frac = i as f64 / 5.0;
             let y = origin.y + padding_top + plot_height * (1.0 - frac);
-            let val = nice_max * frac;
-            let label = if val >= 1000.0 { format!("{}k", (val / 1000.0) as i64) } else { format!("{}", val as i64) };
+            let val = nice_min + y_range * frac;
+            let label = if val.abs() >= 1000.0 { format!("{}k", (val / 1000.0) as i64) } else { format!("{}", val as i64) };
             self.draw_chart_text.draw_walk(cx, Walk { abs_pos: Some(dvec2(origin.x + 4.0, y - 5.0)), ..Walk::fit() }, Align::default(), &label);
             // Grid
             self.draw_chart_axis.color = Vec4 { x: 0.2, y: 0.25, z: 0.35, w: 0.3 };
@@ -3114,22 +3158,39 @@ impl A2uiSurface {
 
         let step_x = plot_width / (label_count as f64 - 1.0).max(1.0);
 
-        // Draw areas (back to front)
+        // Draw areas (back to front) using trapezoid quads for accurate fill
+        let baseline = origin.y + padding_top + plot_height * (1.0 - (0.0 - nice_min) / y_range);
         for (si, series) in chart.series.iter().enumerate().rev() {
             let color = self.get_chart_color(chart, si);
-            // Filled area strips
-            self.draw_chart_triangle.color = color;
-            self.draw_chart_triangle.opacity = 0.25;
             for i in 0..series.values.len().saturating_sub(1).min(label_count.saturating_sub(1)) {
                 let x1 = origin.x + padding_left + i as f64 * step_x;
                 let x2 = origin.x + padding_left + (i + 1) as f64 * step_x;
-                let y1 = origin.y + padding_top + plot_height * (1.0 - series.values[i] / nice_max);
-                let y2 = origin.y + padding_top + plot_height * (1.0 - series.values[i + 1] / nice_max);
-                let top = y1.min(y2);
-                let bottom = origin.y + padding_top + plot_height;
-                self.draw_chart_triangle.draw_walk(cx, Walk {
-                    abs_pos: Some(dvec2(x1, top)),
-                    width: Size::Fixed(x2 - x1), height: Size::Fixed(bottom - top), ..Walk::default()
+                let y1 = origin.y + padding_top + plot_height * (1.0 - (series.values[i] - nice_min) / y_range);
+                let y2 = origin.y + padding_top + plot_height * (1.0 - (series.values[i + 1] - nice_min) / y_range);
+
+                // Bounding box for the trapezoid (data line top, baseline bottom)
+                let min_x = x1 - 1.0;
+                let max_x = x2 + 1.0;
+                let min_y = y1.min(y2).min(baseline) - 1.0;
+                let max_y = y1.max(y2).max(baseline) + 1.0;
+                let w = (max_x - min_x).max(1.0);
+                let h = (max_y - min_y).max(1.0);
+
+                // P0=top-left, P1=top-right, P2=bottom-right, P3=bottom-left
+                // Shader uses pixel coords (self.pos * self.rect_size)
+                self.draw_chart_quad.color = color;
+                self.draw_chart_quad.opacity = 0.25;
+                self.draw_chart_quad.p0x = (x1 - min_x) as f32;
+                self.draw_chart_quad.p0y = (y1 - min_y) as f32;
+                self.draw_chart_quad.p1x = (x2 - min_x) as f32;
+                self.draw_chart_quad.p1y = (y2 - min_y) as f32;
+                self.draw_chart_quad.p2x = (x2 - min_x) as f32;
+                self.draw_chart_quad.p2y = (baseline - min_y) as f32;
+                self.draw_chart_quad.p3x = (x1 - min_x) as f32;
+                self.draw_chart_quad.p3y = (baseline - min_y) as f32;
+                self.draw_chart_quad.draw_walk(cx, Walk {
+                    abs_pos: Some(dvec2(min_x, min_y)),
+                    width: Size::Fixed(w), height: Size::Fixed(h), ..Walk::default()
                 });
             }
         }
@@ -3140,8 +3201,8 @@ impl A2uiSurface {
             for i in 0..series.values.len().saturating_sub(1).min(label_count.saturating_sub(1)) {
                 let x1 = origin.x + padding_left + i as f64 * step_x;
                 let x2 = origin.x + padding_left + (i + 1) as f64 * step_x;
-                let y1 = origin.y + padding_top + plot_height * (1.0 - series.values[i] / nice_max);
-                let y2 = origin.y + padding_top + plot_height * (1.0 - series.values[i + 1] / nice_max);
+                let y1 = origin.y + padding_top + plot_height * (1.0 - (series.values[i] - nice_min) / y_range);
+                let y2 = origin.y + padding_top + plot_height * (1.0 - (series.values[i + 1] - nice_min) / y_range);
                 let min_x = x1.min(x2); let max_x = x1.max(x2);
                 let min_y = y1.min(y2); let max_y = y1.max(y2);
                 let margin = 10.0;
@@ -3161,7 +3222,7 @@ impl A2uiSurface {
             // Data points
             for i in 0..series.values.len().min(label_count) {
                 let px = origin.x + padding_left + i as f64 * step_x;
-                let py = origin.y + padding_top + plot_height * (1.0 - series.values[i] / nice_max);
+                let py = origin.y + padding_top + plot_height * (1.0 - (series.values[i] - nice_min) / y_range);
                 self.draw_chart_point.color = color;
                 self.draw_chart_point.draw_walk(cx, Walk {
                     abs_pos: Some(dvec2(px - 3.0, py - 3.0)),
@@ -3170,12 +3231,14 @@ impl A2uiSurface {
             }
         }
 
-        // X-axis labels
+        // X-axis labels (decimated to prevent overlap)
         self.draw_chart_text.text_style.font_size = 9.0;
+        let label_skip = Self::label_skip_interval(label_count, plot_width, 9.0);
         for (i, label) in chart.labels.iter().enumerate() {
+            if i % label_skip != 0 && i != label_count - 1 { continue; }
             let x = origin.x + padding_left + i as f64 * step_x;
             self.draw_chart_text.draw_walk(cx, Walk {
-                abs_pos: Some(dvec2(x - label.len() as f64 * 2.5, origin.y + padding_top + plot_height + 6.0)),
+                abs_pos: Some(dvec2(x - Self::estimate_text_width(label, 9.0) / 2.0, origin.y + padding_top + plot_height + 6.0)),
                 ..Walk::fit()
             }, Align::default(), label);
         }
@@ -3233,7 +3296,7 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 self.draw_chart_text.draw_walk(cx, Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 }, Align::default(), &title);
             }
@@ -3285,7 +3348,7 @@ impl A2uiSurface {
             let val = nice_x_min + x_range * frac;
             let label = format!("{:.0}", val);
             self.draw_chart_text.draw_walk(cx, Walk {
-                abs_pos: Some(dvec2(x - label.len() as f64 * 2.5, origin.y + padding_top + plot_height + 6.0)),
+                abs_pos: Some(dvec2(x - Self::estimate_text_width(&label, 9.0) / 2.0, origin.y + padding_top + plot_height + 6.0)),
                 ..Walk::fit()
             }, Align::default(), &label);
         }
@@ -3335,7 +3398,7 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 self.draw_chart_text.draw_walk(cx, Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 }, Align::default(), &title);
                 title_height = 24.0;
@@ -3404,7 +3467,7 @@ impl A2uiSurface {
             });
             // Label
             let label_r = radius + 12.0;
-            let lx = center_x + angle.cos() * label_r - chart.labels[i].len() as f64 * 3.0;
+            let lx = center_x + angle.cos() * label_r - Self::estimate_text_width(&chart.labels[i], 10.0) / 2.0;
             let ly = center_y + angle.sin() * label_r - 5.0;
             self.draw_chart_text.text_style.font_size = 9.0;
             self.draw_chart_text.draw_walk(cx, Walk { abs_pos: Some(dvec2(lx, ly)), ..Walk::fit() }, Align::default(), &chart.labels[i]);
@@ -3521,7 +3584,7 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 self.draw_chart_text.draw_walk(cx, Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 }, Align::default(), &title);
                 title_height = 24.0;
@@ -3590,7 +3653,7 @@ impl A2uiSurface {
         let val_str = if value == value.floor() { format!("{:.0}", value) } else { format!("{:.1}", value) };
         self.draw_chart_text.text_style.font_size = 22.0;
         self.draw_chart_text.draw_walk(cx, Walk {
-            abs_pos: Some(dvec2(cx_pos - val_str.len() as f64 * 7.0, cy_pos - 12.0)),
+            abs_pos: Some(dvec2(cx_pos - Self::estimate_text_width(&val_str, 24.0) / 2.0, cy_pos - 12.0)),
             ..Walk::fit()
         }, Align::default(), &val_str);
 
@@ -3599,7 +3662,7 @@ impl A2uiSurface {
         if !unit.is_empty() {
             self.draw_chart_text.text_style.font_size = 11.0;
             self.draw_chart_text.draw_walk(cx, Walk {
-                abs_pos: Some(dvec2(cx_pos - unit.len() as f64 * 3.5, cy_pos + 14.0)),
+                abs_pos: Some(dvec2(cx_pos - Self::estimate_text_width(&unit, 12.0) / 2.0, cy_pos + 14.0)),
                 ..Walk::fit()
             }, Align::default(), unit);
         }
@@ -3608,7 +3671,7 @@ impl A2uiSurface {
         if !chart.labels.is_empty() {
             self.draw_chart_text.text_style.font_size = 10.0;
             self.draw_chart_text.draw_walk(cx, Walk {
-                abs_pos: Some(dvec2(cx_pos - chart.labels[0].len() as f64 * 3.0, cy_pos + arc_box * 0.3)),
+                abs_pos: Some(dvec2(cx_pos - Self::estimate_text_width(&chart.labels[0], 10.0) / 2.0, cy_pos + arc_box * 0.3)),
                 ..Walk::fit()
             }, Align::default(), &chart.labels[0]);
         }
@@ -3643,7 +3706,7 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 self.draw_chart_text.draw_walk(cx, Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 }, Align::default(), &title);
             }
@@ -3685,7 +3748,7 @@ impl A2uiSurface {
             let x = origin.x + padding_left + plot_width * frac;
             let xlabel = format!("{:.0}", x_max * frac);
             self.draw_chart_text.draw_walk(cx, Walk {
-                abs_pos: Some(dvec2(x - xlabel.len() as f64 * 2.5, origin.y + padding_top + plot_height + 6.0)),
+                abs_pos: Some(dvec2(x - Self::estimate_text_width(&xlabel, 9.0) / 2.0, origin.y + padding_top + plot_height + 6.0)),
                 ..Walk::fit()
             }, Align::default(), &xlabel);
         }
@@ -3709,7 +3772,7 @@ impl A2uiSurface {
             if i < chart.labels.len() {
                 self.draw_chart_text.text_style.font_size = 8.0;
                 self.draw_chart_text.draw_walk(cx, Walk {
-                    abs_pos: Some(dvec2(px - chart.labels[i].len() as f64 * 2.5, py + bubble_r + 3.0)),
+                    abs_pos: Some(dvec2(px - Self::estimate_text_width(&chart.labels[i], 9.0) / 2.0, py + bubble_r + 3.0)),
                     ..Walk::fit()
                 }, Align::default(), &chart.labels[i]);
             }
@@ -3745,7 +3808,7 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 self.draw_chart_text.draw_walk(cx, Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 }, Align::default(), &title);
             }
@@ -3831,12 +3894,14 @@ impl A2uiSurface {
             });
         }
 
-        // X-axis labels
+        // X-axis labels (decimated to prevent overlap)
         self.draw_chart_text.text_style.font_size = 9.0;
+        let label_skip = Self::label_skip_interval(candle_count, plot_width, 9.0);
         for (i, label) in chart.labels.iter().take(candle_count).enumerate() {
+            if i % label_skip != 0 && i != candle_count - 1 { continue; }
             let x = origin.x + padding_left + (i as f64 + 0.5) * group_width;
             self.draw_chart_text.draw_walk(cx, Walk {
-                abs_pos: Some(dvec2(x - label.len() as f64 * 2.5, origin.y + padding_top + plot_height + 6.0)),
+                abs_pos: Some(dvec2(x - Self::estimate_text_width(label, 9.0) / 2.0, origin.y + padding_top + plot_height + 6.0)),
                 ..Walk::fit()
             }, Align::default(), label);
         }
@@ -3866,7 +3931,7 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 self.draw_chart_text.draw_walk(cx, Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 }, Align::default(), &title);
                 title_height = 24.0;
@@ -3918,7 +3983,7 @@ impl A2uiSurface {
                     self.draw_chart_text.text_style.font_size = 8.0;
                     let vstr = format!("{:.0}", val);
                     self.draw_chart_text.draw_walk(cx, Walk {
-                        abs_pos: Some(dvec2(cx_pos + cell_w / 2.0 - vstr.len() as f64 * 2.5, cy_pos + cell_h / 2.0 - 5.0)),
+                        abs_pos: Some(dvec2(cx_pos + cell_w / 2.0 - Self::estimate_text_width(&vstr, 8.0) / 2.0, cy_pos + cell_h / 2.0 - 5.0)),
                         ..Walk::fit()
                     }, Align::default(), &vstr);
                 }
@@ -3928,7 +3993,7 @@ impl A2uiSurface {
         // Column headers
         self.draw_chart_text.text_style.font_size = 9.0;
         for (i, label) in chart.labels.iter().enumerate() {
-            let x = origin.x + left_margin + i as f64 * cell_w + cell_w / 2.0 - label.len() as f64 * 2.5;
+            let x = origin.x + left_margin + i as f64 * cell_w + cell_w / 2.0 - Self::estimate_text_width(label, 9.0) / 2.0;
             self.draw_chart_text.draw_walk(cx, Walk {
                 abs_pos: Some(dvec2(x, origin.y + title_height + 2.0)),
                 ..Walk::fit()
@@ -3989,7 +4054,7 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 self.draw_chart_text.draw_walk(cx, Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 }, Align::default(), &title);
                 title_height = 24.0;
@@ -4140,7 +4205,7 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 self.draw_chart_text.draw_walk(cx, Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 }, Align::default(), &title);
                 title_height = 24.0;
@@ -4198,6 +4263,7 @@ impl A2uiSurface {
 
         // Draw chord ribbons using DrawA2uiQuad (proper quadrilateral shader)
         let inner_r = radius * inner_frac;
+        let mut dst_angle_cursors: Vec<f64> = arc_starts.clone();
         for i in 0..n {
             let vals = &chart.series[i].values;
             let mut src_angle_cursor = arc_starts[i];
@@ -4213,11 +4279,10 @@ impl A2uiSurface {
                 let src_a1 = src_angle_cursor + src_span;
                 src_angle_cursor += src_span;
 
-                // Target position on target arc
-                let dst_mid = (arc_starts[j] + arc_ends[j]) / 2.0;
-                let dst_half = src_span * 0.5;
-                let dst_a0 = dst_mid - dst_half;
-                let dst_a1 = dst_mid + dst_half;
+                // Target position on target arc — consume from destination cursor
+                let dst_a0 = dst_angle_cursors[j];
+                let dst_a1 = dst_a0 + src_span;
+                dst_angle_cursors[j] += src_span;
 
                 let color = self.get_chart_color(chart, i);
                 let mut fill_color = color;
@@ -4349,7 +4414,7 @@ impl A2uiSurface {
             let label = &chart.labels[i];
             self.draw_chart_text.text_style.font_size = 10.0;
             self.draw_chart_text.draw_walk(cx, Walk {
-                abs_pos: Some(dvec2(lx - label.len() as f64 * 3.0, ly - 5.0)),
+                abs_pos: Some(dvec2(lx - Self::estimate_text_width(label, 10.0) / 2.0, ly - 5.0)),
                 ..Walk::fit()
             }, Align::default(), label);
         }
@@ -4382,7 +4447,7 @@ impl A2uiSurface {
             if !title.is_empty() {
                 self.draw_chart_text.text_style.font_size = 14.0;
                 self.draw_chart_text.draw_walk(cx, Walk {
-                    abs_pos: Some(dvec2(origin.x + chart_width / 2.0 - title.len() as f64 * 4.0, origin.y + 4.0)),
+                    abs_pos: Some(dvec2(origin.x + (chart_width - Self::estimate_text_width(&title, 14.0)) / 2.0, origin.y + 4.0)),
                     ..Walk::fit()
                 }, Align::default(), &title);
                 title_height = 24.0;
@@ -4562,7 +4627,7 @@ impl A2uiSurface {
             let label = &chart.labels[i];
             self.draw_chart_text.text_style.font_size = 9.0;
             let lx = if layers[i] == 0 {
-                node_x[i] - label.len() as f64 * 5.0 - 6.0
+                node_x[i] - Self::estimate_text_width(label, 9.0) - 6.0
             } else {
                 node_x[i] + node_width + 6.0
             };
