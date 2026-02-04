@@ -3,6 +3,7 @@ members = [
     "crates/ui",
     "crates/component-zoo",
     "crates/a2ui-demo",
+    "crates/makepad-plot",
 ]
 resolver = "2"
 
@@ -14,4 +15,5 @@ publish = false
 
 [workspace.dependencies]
 makepad-component = { path = "crates/ui" }
+makepad-plot = { path = "crates/makepad-plot" }
 makepad-widgets = { git = "https://github.com/makepad/makepad", branch = "dev" }

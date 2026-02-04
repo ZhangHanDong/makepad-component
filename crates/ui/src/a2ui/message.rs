@@ -459,6 +459,7 @@ pub struct ChartComponent {
     pub title: Option<StringValue>,
 
     /// Category labels (X-axis for bar/line, slice labels for pie)
+    #[serde(default)]
     pub labels: Vec<String>,
 
     /// Data series - each series has a name and values
@@ -483,6 +484,30 @@ pub struct ChartComponent {
     /// Max value (used by gauge chart as dial maximum, default 100)
     #[serde(default)]
     pub max_value: Option<f64>,
+
+    /// Whether the chart is interactive (pan/zoom)
+    #[serde(default)]
+    pub interactive: Option<bool>,
+
+    /// Colormap name (e.g., "viridis", "plasma", "inferno")
+    #[serde(default)]
+    pub colormap: Option<String>,
+
+    /// Whether to stack series data
+    #[serde(default)]
+    pub stacked: Option<bool>,
+
+    /// Whether bars/layout should be horizontal
+    #[serde(default)]
+    pub horizontal: Option<bool>,
+
+    /// X-axis label
+    #[serde(default)]
+    pub x_label: Option<String>,
+
+    /// Y-axis label
+    #[serde(default)]
+    pub y_label: Option<String>,
 }
 
 fn default_chart_width() -> f64 {
@@ -501,14 +526,19 @@ pub struct ChartSeries {
     #[serde(default)]
     pub name: Option<String>,
 
-    /// Data values
+    /// Data values (Y-axis or primary values)
     pub values: Vec<f64>,
+
+    /// Explicit X-axis values (optional; defaults to 0, 1, 2, ... if absent)
+    #[serde(default)]
+    pub x_values: Option<Vec<f64>>,
 }
 
 /// Supported chart types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ChartType {
+    // Original types
     Bar,
     Line,
     Pie,
@@ -522,6 +552,24 @@ pub enum ChartType {
     Treemap,
     Chord,
     Sankey,
+    // New types from makepad-plot
+    Histogram,
+    BoxPlot,
+    Donut,
+    Stem,
+    Violin,
+    Polar,
+    Contour,
+    Waterfall,
+    Funnel,
+    Step,
+    Stackplot,
+    Hexbin,
+    Streamgraph,
+    // 3D types
+    Surface3d,
+    Scatter3d,
+    Line3d,
 }
 
 // ============================================================================

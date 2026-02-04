@@ -783,6 +783,7 @@ dependencies = [
 name = "makepad-component"
 version = "0.1.0"
 dependencies = [
+ "makepad-plot",
  "makepad-widgets",
  "serde",
  "serde_json",
@@ -1013,6 +1014,13 @@ dependencies = [
  "windows",
  "windows-core",
  "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "makepad-plot"
+version = "0.1.0"
+dependencies = [
+ "makepad-widgets",
 ]
 
 [[package]]

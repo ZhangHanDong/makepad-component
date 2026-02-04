@@ -43,6 +43,7 @@ mod value;
 mod sse;
 mod a2a_client;
 mod host;
+pub mod chart_bridge;
 
 pub use message::*;
 pub use data_model::*;
