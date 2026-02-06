@@ -19,3 +19,4 @@ node_modules/
 .codexdebug/
 debug/
 .cowork/
+*.log
