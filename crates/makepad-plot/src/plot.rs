@@ -5655,12 +5655,8 @@ impl Surface3D {
 
 impl Widget for Surface3D {
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
-        // Use DrawQuad begin/end pattern to properly set up hit area
-        self.draw_fill.color = vec4(0.0, 0.0, 0.0, 0.0);
-        self.draw_fill.begin(cx, walk, Layout::default());
-        let rect = cx.turtle().rect();
+        let rect = cx.walk_turtle(walk);
         self.hit_rect = rect;  // Store for manual hit testing
-
 
         if rect.size.x > 0.0 && rect.size.y > 0.0 && !self.z_data.is_empty() {
             // Initialize defaults
@@ -5787,23 +5783,19 @@ impl Widget for Surface3D {
             }
         }
 
-        self.draw_fill.end(cx);
         DrawStep::done()
     }
 
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        self.view.handle_event(cx, event, scope);
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
+        // Surface3D is not in the widget tree (it's a render helper inside A2uiSurface),
+        // so event.hits() won't work. Use raw Event matching with stored hit_rect instead.
+        // Also use cx.redraw_all() since self.view.redraw() won't propagate to parent.
+        let r = self.hit_rect;
+        if r.size.x <= 0.0 || r.size.y <= 0.0 { return; }
 
-        // Helper to check if point is inside our rect
-        let point_in_rect = |p: DVec2| -> bool {
-            p.x >= self.hit_rect.pos.x && p.x <= self.hit_rect.pos.x + self.hit_rect.size.x &&
-            p.y >= self.hit_rect.pos.y && p.y <= self.hit_rect.pos.y + self.hit_rect.size.y
-        };
-
-        // Manual hit testing using stored rect
         match event {
             Event::MouseDown(me) => {
-                if point_in_rect(me.abs) {
+                if r.contains(me.abs) {
                     self.drag_start = Some(me.abs);
                     self.start_azimuth = self.view3d.azimuth;
                     self.start_elevation = self.view3d.elevation;
@@ -5812,24 +5804,20 @@ impl Widget for Surface3D {
             Event::MouseMove(me) => {
                 if let Some(start) = self.drag_start {
                     let delta = me.abs - start;
-                    // Horizontal drag changes azimuth, vertical changes elevation
                     self.view3d.azimuth = self.start_azimuth + delta.x * 0.5;
                     self.view3d.elevation = (self.start_elevation - delta.y * 0.5).clamp(-89.0, 89.0);
-                    self.view.redraw(cx);
+                    cx.redraw_all();
                 }
             }
             Event::MouseUp(_) => {
-                if self.drag_start.is_some() {
-                    self.drag_start = None;
-                }
+                self.drag_start = None;
             }
             Event::Scroll(se) => {
-                if point_in_rect(se.abs) {
-                    // Scroll to zoom
+                if r.contains(se.abs) {
                     if self.zoom == 0.0 { self.zoom = 1.0; }
                     let zoom_delta = 1.0 + se.scroll.y * 0.001;
                     self.zoom = (self.zoom * zoom_delta).clamp(0.2, 5.0);
-                    self.view.redraw(cx);
+                    cx.redraw_all();
                 }
             }
             _ => {}
