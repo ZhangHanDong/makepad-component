@@ -70,6 +70,13 @@ live_design! {
                             draw_bg: { color: #0066CC }
                         }
 
+                        // Math charts demo button
+                        math_btn = <Button> {
+                            text: "Math Charts"
+                            draw_text: { color: #FFFFFF }
+                            draw_bg: { color: #AA6600 }
+                        }
+
                         // Connect to server button
                         connect_btn = <Button> {
                             text: "🎨 Live Editor"
@@ -158,6 +165,11 @@ impl App {
         // Handle "Load Static Data" button click
         if self.ui.button(ids!(load_btn)).clicked(&actions) {
             self.load_a2ui_data(cx);
+        }
+
+        // Handle "Math Charts" button click
+        if self.ui.button(ids!(math_btn)).clicked(&actions) {
+            self.load_math_charts(cx);
         }
 
         // Handle "Connect to Server" button click
@@ -487,13 +499,73 @@ impl App {
 
         self.ui.redraw(cx);
     }
+
+    fn load_math_charts(&mut self, cx: &mut Cx) {
+        // Disconnect from server if connected
+        if self.host.is_some() {
+            self.disconnect(cx);
+        }
+        self.live_mode = false;
+
+        // Clear the surface before loading
+        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
+            surface.clear();
+        }
+
+        self.ui.label(ids!(title_label)).set_text(cx, "Famous Mathematical Functions");
+
+        // Try to load math_test.json from current directory
+        let json_str = match std::fs::read_to_string("math_test.json") {
+            Ok(s) => s,
+            Err(e) => {
+                self.ui.label(ids!(status_label))
+                    .set_text(cx, &format!("Error: math_test.json not found ({}). Run: cargo run -p a2ui-demo --bin math-charts", e));
+                self.ui.redraw(cx);
+                return;
+            }
+        };
+
+        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let result = {
+            if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
+                match surface.process_json(&json_str) {
+                    Ok(events) => {
+                        log!("Math charts: {} events processed", events.len());
+                        Some(events.len())
+                    }
+                    Err(e) => {
+                        log!("Error parsing math_test.json: {}", e);
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        };
+
+        if let Some(count) = result {
+            self.ui.label(ids!(status_label))
+                .set_text(cx, &format!("Math Demo | {} events | Chebyshev, Fourier, Rosenbrock, Himmelblau, Legendre, Rastrigin", count));
+            self.loaded = true;
+        } else {
+            self.ui.label(ids!(status_label))
+                .set_text(cx, "Error loading math charts data");
+        }
+
+        self.ui.redraw(cx);
+    }
 }
 
 impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
-        // Auto-connect to live server on startup
+        // Auto-load math charts on startup if math_test.json exists
         if let Event::Startup = event {
-            self.connect_to_server(cx);
+            if std::path::Path::new("math_test.json").exists() {
+                self.load_math_charts(cx);
+            } else {
+                self.connect_to_server(cx);
+            }
             // Start interval timer for polling instead of continuous frame requests
             self.poll_timer = cx.start_interval(1.0);
         }

@@ -24,6 +24,14 @@ path = "src/watch_server.rs"
 name = "kimi-bridge"
 path = "src/kimi_bridge.rs"
 
+[[bin]]
+name = "math-charts"
+path = "src/math_charts.rs"
+
+[[bin]]
+name = "fft-demo"
+path = "src/fft_demo.rs"
+
 [dependencies]
 makepad-component = { workspace = true }
 makepad-widgets = { workspace = true }
