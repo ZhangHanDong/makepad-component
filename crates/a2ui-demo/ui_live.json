@@ -1,0 +1,246 @@
+[
+    {
+        "beginRendering": {
+            "surfaceId": "music-player",
+            "root": "root-column"
+        }
+    },
+    {
+        "surfaceUpdate": {
+            "surfaceId": "music-player",
+            "components": [
+                {
+                    "id": "root-column",
+                    "component": {
+                        "Column": {
+                            "children": {
+                                "explicitList": ["header", "now-playing", "playlist"]
+                            }
+                        }
+                    }
+                },
+                {
+                    "id": "header",
+                    "component": {
+                        "Text": {
+                            "text": {"literalString": "SoundHelix Music Player"},
+                            "usageHint": "h1"
+                        }
+                    }
+                },
+                {
+                    "id": "now-playing",
+                    "component": {
+                        "Card": {
+                            "child": "now-playing-content"
+                        }
+                    }
+                },
+                {
+                    "id": "now-playing-content",
+                    "component": {
+                        "Column": {
+                            "children": {
+                                "explicitList": ["now-playing-label", "now-playing-title"]
+                            }
+                        }
+                    }
+                },
+                {
+                    "id": "now-playing-label",
+                    "component": {
+                        "Text": {
+                            "text": {"literalString": "Now Playing:"},
+                            "usageHint": "h3"
+                        }
+                    }
+                },
+                {
+                    "id": "now-playing-title",
+                    "component": {
+                        "Text": {
+                            "text": {"path": "/player/currentTrack"}
+                        }
+                    }
+                },
+                {
+                    "id": "playlist",
+                    "component": {
+                        "Column": {
+                            "children": {
+                                "explicitList": ["playlist-header", "song-1", "song-2", "song-3", "song-4", "song-5", "song-6", "song-7", "song-8", "song-9", "song-10", "song-11", "song-12", "song-13", "song-14", "song-15", "song-16"]
+                            }
+                        }
+                    }
+                },
+                {
+                    "id": "playlist-header",
+                    "component": {
+                        "Text": {
+                            "text": {"literalString": "Playlist (16 Songs)"},
+                            "usageHint": "h2"
+                        }
+                    }
+                },
+                {
+                    "id": "song-1",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"},
+                            "title": {"literalString": "SoundHelix Song 1"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-2",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"},
+                            "title": {"literalString": "SoundHelix Song 2"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-3",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"},
+                            "title": {"literalString": "SoundHelix Song 3"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-4",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"},
+                            "title": {"literalString": "SoundHelix Song 4"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-5",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"},
+                            "title": {"literalString": "SoundHelix Song 5"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-6",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3"},
+                            "title": {"literalString": "SoundHelix Song 6"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-7",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3"},
+                            "title": {"literalString": "SoundHelix Song 7"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-8",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"},
+                            "title": {"literalString": "SoundHelix Song 8"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-9",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3"},
+                            "title": {"literalString": "SoundHelix Song 9"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-10",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3"},
+                            "title": {"literalString": "SoundHelix Song 10"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-11",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3"},
+                            "title": {"literalString": "SoundHelix Song 11"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-12",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3"},
+                            "title": {"literalString": "SoundHelix Song 12"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-13",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3"},
+                            "title": {"literalString": "SoundHelix Song 13"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-14",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3"},
+                            "title": {"literalString": "SoundHelix Song 14"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-15",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3"},
+                            "title": {"literalString": "SoundHelix Song 15"}
+                        }
+                    }
+                },
+                {
+                    "id": "song-16",
+                    "component": {
+                        "AudioPlayer": {
+                            "url": {"literalString": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3"},
+                            "title": {"literalString": "SoundHelix Song 16"}
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "dataModelUpdate": {
+            "surfaceId": "music-player",
+            "path": "/",
+            "contents": [
+                {
+                    "key": "player",
+                    "valueMap": [
+                        {"key": "currentTrack", "valueString": "Select a song to play"}
+                    ]
+                }
+            ]
+        }
+    }
+]

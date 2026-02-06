@@ -114,7 +114,7 @@ impl SseClient {
 
         // Spawn thread to handle streaming response
         thread::spawn(move || {
-            if let Err(e) = Self::stream_request(&url, &headers, &body, &tx) {
+            if let Err(e) = Self::stream_post(&url, &headers, &body, &tx) {
                 let _ = tx.send(SseEvent::Error(e));
             }
             let _ = tx.send(SseEvent::Done);
@@ -123,7 +123,71 @@ impl SseClient {
         Ok(rx)
     }
 
-    fn stream_request(
+    /// Send GET request and return SSE event receiver (for /live endpoint)
+    pub fn get(self) -> Result<Receiver<SseEvent>, String> {
+        let (tx, rx) = mpsc::channel();
+        let url = self.url.clone();
+        let headers = self.headers.clone();
+
+        // Spawn thread to handle streaming response
+        thread::spawn(move || {
+            if let Err(e) = Self::stream_get(&url, &headers, &tx) {
+                let _ = tx.send(SseEvent::Error(e));
+            }
+            let _ = tx.send(SseEvent::Done);
+        });
+
+        Ok(rx)
+    }
+
+    fn stream_get(
+        url: &str,
+        headers: &[(String, String)],
+        tx: &Sender<SseEvent>,
+    ) -> Result<(), String> {
+        let mut request = ureq::get(url)
+            .set("Accept", "text/event-stream");
+
+        for (key, value) in headers {
+            request = request.set(key, value);
+        }
+
+        let response = request
+            .call()
+            .map_err(|e| format!("HTTP GET failed: {}", e))?;
+
+        if response.status() != 200 {
+            return Err(format!("HTTP error: {}", response.status()));
+        }
+
+        let reader = response.into_reader();
+        let buf_reader = BufReader::new(reader);
+        let mut parser = SseParser::new();
+
+        for line_result in buf_reader.lines() {
+            match line_result {
+                Ok(line) => {
+                    if let Some(event) = parser.parse_line(&line) {
+                        if tx.send(event).is_err() {
+                            break;
+                        }
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(SseEvent::Error(format!("Read error: {}", e)));
+                    break;
+                }
+            }
+        }
+
+        if let Some(event) = parser.flush() {
+            let _ = tx.send(event);
+        }
+
+        Ok(())
+    }
+
+    fn stream_post(
         url: &str,
         headers: &[(String, String)],
         body: &str,
@@ -135,6 +199,7 @@ impl SseClient {
             .build();
 
         let mut request = agent.post(url)
+        let mut request = ureq::post(url)
             .set("Content-Type", "application/json")
             .set("Accept", "text/event-stream");
 

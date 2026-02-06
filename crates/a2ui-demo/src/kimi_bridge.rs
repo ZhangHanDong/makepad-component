@@ -25,6 +25,132 @@ use tokio::sync::broadcast;
 use tokio::sync::RwLock;
 
 const KIMI_API_URL: &str = "https://api.moonshot.ai/v1/chat/completions";
+#[cfg(feature = "mureka")]
+const MUREKA_API_URL: &str = "https://api.mureka.ai";
+
+// ============================================================================
+// Mureka API Client (optional feature)
+// ============================================================================
+
+#[cfg(feature = "mureka")]
+#[derive(Debug, Clone)]
+struct MurekaClient {
+    api_key: String,
+    client: reqwest::Client,
+}
+
+#[cfg(feature = "mureka")]
+#[derive(Debug, Deserialize)]
+struct MurekaGenerateResponse {
+    job_id: String,
+}
+
+#[cfg(feature = "mureka")]
+#[derive(Debug, Deserialize)]
+struct MurekaJobStatus {
+    status: String,  // "pending", "processing", "completed", "failed"
+    #[serde(default)]
+    songs: Vec<MurekaSong>,
+}
+
+#[cfg(feature = "mureka")]
+#[derive(Debug, Deserialize, Clone)]
+struct MurekaSong {
+    #[allow(dead_code)]
+    id: String,
+    #[serde(default)]
+    audio_url: Option<String>,
+    #[serde(default)]
+    title: Option<String>,
+}
+
+#[cfg(feature = "mureka")]
+impl MurekaClient {
+    fn new(api_key: String) -> Self {
+        MurekaClient {
+            api_key,
+            client: reqwest::Client::new(),
+        }
+    }
+
+    async fn generate_music(&self, prompt: &str, instrumental: bool) -> Result<String, String> {
+        let body = if instrumental {
+            json!({
+                "description": prompt,
+                "instrumental": true
+            })
+        } else {
+            json!({
+                "lyrics": prompt
+            })
+        };
+
+        let response = self.client
+            .post(format!("{}/v1/song/generate", MUREKA_API_URL))
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Mureka request failed: {}", e))?;
+
+        let status = response.status();
+        let body = response.text().await.map_err(|e| format!("Failed to read Mureka response: {}", e))?;
+
+        if !status.is_success() {
+            return Err(format!("Mureka API error ({}): {}", status, body));
+        }
+
+        let result: MurekaGenerateResponse = serde_json::from_str(&body)
+            .map_err(|e| format!("Failed to parse Mureka response: {} - Body: {}", e, body))?;
+
+        Ok(result.job_id)
+    }
+
+    async fn poll_job(&self, job_id: &str) -> Result<MurekaJobStatus, String> {
+        let response = self.client
+            .get(format!("{}/v1/song/generate/jobs/{}", MUREKA_API_URL, job_id))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .send()
+            .await
+            .map_err(|e| format!("Mureka poll failed: {}", e))?;
+
+        let status = response.status();
+        let body = response.text().await.map_err(|e| format!("Failed to read Mureka poll response: {}", e))?;
+
+        if !status.is_success() {
+            return Err(format!("Mureka poll error ({}): {}", status, body));
+        }
+
+        let result: MurekaJobStatus = serde_json::from_str(&body)
+            .map_err(|e| format!("Failed to parse Mureka poll response: {} - Body: {}", e, body))?;
+
+        Ok(result)
+    }
+
+    /// Wait for music generation to complete (with timeout)
+    async fn wait_for_completion(&self, job_id: &str, max_attempts: u32) -> Result<Vec<MurekaSong>, String> {
+        for attempt in 0..max_attempts {
+            let status = self.poll_job(job_id).await?;
+
+            match status.status.as_str() {
+                "completed" => {
+                    return Ok(status.songs);
+                }
+                "failed" => {
+                    return Err("Music generation failed".to_string());
+                }
+                _ => {
+                    // Still processing, wait and retry
+                    println!("[Mureka] Job {} status: {} (attempt {}/{})", job_id, status.status, attempt + 1, max_attempts);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                }
+            }
+        }
+
+        Err("Music generation timed out".to_string())
+    }
+}
 
 // ============================================================================
 // A2UI Component Tools Definition
@@ -226,6 +352,38 @@ fn get_a2ui_tools() -> Value {
                     "required": ["rootId"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "generate_music",
+                "description": "Generate AI music using Mureka API. Returns a job ID that will be polled for completion. The music generation takes about 45 seconds.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {"type": "string", "description": "Description of the music to generate (e.g., 'relaxing piano melody', 'upbeat electronic dance')"},
+                        "instrumental": {"type": "boolean", "description": "If true, generate instrumental music without lyrics. Default true."}
+                    },
+                    "required": ["prompt"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "create_audio_player",
+                "description": "Create an audio player component to play music. Use this after generate_music returns an audio URL.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string", "description": "Unique component ID"},
+                        "url": {"type": "string", "description": "Audio URL to play"},
+                        "title": {"type": "string", "description": "Song title"},
+                        "artist": {"type": "string", "description": "Artist name (optional)"}
+                    },
+                    "required": ["id", "url", "title"]
+                }
+            }
         }
     ])
 }
@@ -271,6 +429,12 @@ struct A2uiBuilder {
     components: Vec<Value>,
     data_contents: Vec<Value>,
     root_id: Option<String>,
+    #[cfg(feature = "mureka")]
+    /// Pending music generation requests (prompt, instrumental)
+    pending_music: Vec<(String, bool)>,
+    #[cfg(feature = "mureka")]
+    /// Generated audio URLs from Mureka
+    generated_audio: Vec<MurekaSong>,
 }
 
 impl A2uiBuilder {
@@ -279,6 +443,10 @@ impl A2uiBuilder {
             components: Vec::new(),
             data_contents: Vec::new(),
             root_id: None,
+            #[cfg(feature = "mureka")]
+            pending_music: Vec::new(),
+            #[cfg(feature = "mureka")]
+            generated_audio: Vec::new(),
         }
     }
 
@@ -295,8 +463,41 @@ impl A2uiBuilder {
             "create_chart" => self.create_chart(args),
             "set_data" => self.set_data(args),
             "render_ui" => self.render_ui(args),
+            #[cfg(feature = "mureka")]
+            "generate_music" => self.generate_music(args),
+            "create_audio_player" => self.create_audio_player(args),
             _ => eprintln!("Unknown tool: {}", name),
         }
+    }
+
+    #[cfg(feature = "mureka")]
+    fn generate_music(&mut self, args: &Value) {
+        let prompt = args["prompt"].as_str().unwrap_or("relaxing music").to_string();
+        let instrumental = args["instrumental"].as_bool().unwrap_or(true);
+        self.pending_music.push((prompt, instrumental));
+    }
+
+    fn create_audio_player(&mut self, args: &Value) {
+        let id = args["id"].as_str().unwrap_or("audio-player");
+        let url = args["url"].as_str().unwrap_or("");
+        let title = args["title"].as_str().unwrap_or("Audio");
+        let artist = args["artist"].as_str();
+
+        let mut audio_player = json!({
+            "url": {"literalString": url},
+            "title": {"literalString": title}
+        });
+
+        if let Some(artist_name) = artist {
+            audio_player["artist"] = json!({"literalString": artist_name});
+        }
+
+        self.components.push(json!({
+            "id": id,
+            "component": {
+                "AudioPlayer": audio_player
+            }
+        }));
     }
 
     fn create_text(&mut self, args: &Value) {
@@ -574,6 +775,21 @@ impl A2uiBuilder {
         }
     }
 
+    #[cfg(feature = "mureka")]
+    fn has_pending_music(&self) -> bool {
+        !self.pending_music.is_empty()
+    }
+
+    #[cfg(feature = "mureka")]
+    fn get_pending_music(&self) -> Vec<(String, bool)> {
+        self.pending_music.clone()
+    }
+
+    #[cfg(feature = "mureka")]
+    fn set_generated_audio(&mut self, songs: Vec<MurekaSong>) {
+        self.generated_audio = songs;
+    }
+
     fn build_a2ui_json(&self) -> Value {
         let root = self.root_id.as_deref().unwrap_or("root");
         let mut components = self.components.clone();
@@ -657,6 +873,8 @@ impl A2uiBuilder {
 
 struct ServerState {
     api_key: String,
+    #[cfg(feature = "mureka")]
+    mureka_client: Option<MurekaClient>,
     tx: broadcast::Sender<String>,
     conversation: RwLock<Vec<Value>>,
     latest_a2ui: RwLock<Option<Value>>,
@@ -695,6 +913,216 @@ async fn call_kimi(api_key: &str, messages: Vec<Value>) -> Result<KimiResponse, 
     }
 
     serde_json::from_str(&body).map_err(|e| format!("Failed to parse response: {} - Body: {}", e, body))
+}
+
+/// Streaming version of call_kimi - broadcasts components as they arrive
+async fn call_kimi_stream(
+    api_key: &str,
+    messages: Vec<Value>,
+    tx: &broadcast::Sender<String>,
+) -> Result<KimiResponse, String> {
+    use futures_util::StreamExt;
+
+    let client = reqwest::Client::new();
+
+    let request_body = json!({
+        "model": "kimi-k2.5",
+        "messages": messages,
+        "tools": get_a2ui_tools(),
+        "temperature": 1,
+        "max_tokens": 8192,
+        "stream": true
+    });
+
+    let response = client
+        .post(KIMI_API_URL)
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&request_body)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("API error ({}): {}", status, body));
+    }
+
+    // Accumulate tool calls from stream
+    let mut tool_calls: HashMap<i64, (String, String, String)> = HashMap::new(); // index -> (id, name, arguments)
+    let mut processed_indices: std::collections::HashSet<i64> = std::collections::HashSet::new();
+    let mut sent_begin = false;
+    let mut accumulated_components: Vec<Value> = Vec::new(); // For ui_live.json updates
+
+    // Clear ui_live.json at start of new stream
+    let _ = std::fs::write("ui_live.json", "[]");
+
+    let mut stream = response.bytes_stream();
+    let mut buffer = String::new();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
+        buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+        // Process complete SSE lines
+        while let Some(pos) = buffer.find("\n\n") {
+            let line = buffer[..pos].to_string();
+            buffer = buffer[pos + 2..].to_string();
+
+            if line.starts_with("data: ") {
+                let data = &line[6..];
+                if data == "[DONE]" {
+                    continue;
+                }
+
+                if let Ok(chunk_json) = serde_json::from_str::<Value>(data) {
+                    // Extract delta tool_calls
+                    if let Some(choices) = chunk_json.get("choices").and_then(|c| c.as_array()) {
+                        for choice in choices {
+                            if let Some(delta) = choice.get("delta") {
+                                if let Some(calls) = delta.get("tool_calls").and_then(|t| t.as_array()) {
+                                    for call in calls {
+                                        let index = call.get("index").and_then(|i| i.as_i64()).unwrap_or(0);
+                                        let id = call.get("id").and_then(|s| s.as_str()).unwrap_or("");
+                                        let func = call.get("function");
+                                        let name = func.and_then(|f| f.get("name")).and_then(|n| n.as_str()).unwrap_or("");
+                                        let args_chunk = func.and_then(|f| f.get("arguments")).and_then(|a| a.as_str()).unwrap_or("");
+
+                                        let entry = tool_calls.entry(index).or_insert_with(|| (String::new(), String::new(), String::new()));
+
+                                        if !id.is_empty() {
+                                            entry.0 = id.to_string();
+                                        }
+                                        if !name.is_empty() {
+                                            entry.1 = name.to_string();
+                                        }
+                                        entry.2.push_str(args_chunk);
+
+                                        // Try to parse complete arguments and send component immediately
+                                        if !entry.1.is_empty() && !entry.2.is_empty() && !processed_indices.contains(&index) {
+                                            if let Ok(args) = serde_json::from_str::<Value>(&entry.2) {
+                                                // Mark as processed
+                                                processed_indices.insert(index);
+
+                                                // Send beginRendering on first component
+                                                if !sent_begin {
+                                                    sent_begin = true;
+                                                    let begin_msg = json!([
+                                                        {"beginRendering": {"surfaceId": "main", "root": "streaming-root"}}
+                                                    ]);
+                                                    let _ = tx.send(begin_msg.to_string());
+                                                    println!("[Stream] Sent beginRendering");
+                                                }
+
+                                                // Build component JSON directly based on tool name
+                                                let component = build_component_json(&entry.1, &args);
+                                                if let Some(comp) = component {
+                                                    let update_msg = json!([
+                                                        {"surfaceUpdate": {"surfaceId": "main", "components": [comp.clone()]}}
+                                                    ]);
+                                                    let _ = tx.send(update_msg.to_string());
+                                                    println!("[Stream] Sent component: {}", entry.1);
+
+                                                    // Accumulate and write to ui_live.json for /rpc polling
+                                                    accumulated_components.push(comp);
+                                                    let a2ui = json!([
+                                                        {"beginRendering": {"surfaceId": "main", "root": "streaming-root"}},
+                                                        {"surfaceUpdate": {"surfaceId": "main", "components": accumulated_components}},
+                                                        {"dataModelUpdate": {"surfaceId": "main", "path": "/", "contents": []}}
+                                                    ]);
+                                                    let _ = std::fs::write("ui_live.json", serde_json::to_string(&a2ui).unwrap_or_default());
+                                                    println!("[Stream] Updated ui_live.json ({} components)", accumulated_components.len());
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Build final response from accumulated tool calls
+    // Note: Components have already been streamed, this is for compatibility
+    let tool_call_list: Vec<KimiToolCall> = tool_calls.into_iter()
+        .filter(|(_, (_, name, _))| !name.is_empty())
+        .map(|(_, (id, name, args))| KimiToolCall {
+            id,
+            function: KimiFunctionCall { name, arguments: args },
+        })
+        .collect();
+
+    Ok(KimiResponse {
+        choices: vec![KimiChoice {
+            message: KimiMessage {
+                content: None,
+                reasoning_content: None,
+                tool_calls: if tool_call_list.is_empty() { None } else { Some(tool_call_list) },
+            },
+        }],
+    })
+}
+
+/// Build component JSON directly from tool name and args (for streaming)
+fn build_component_json(name: &str, args: &Value) -> Option<Value> {
+    let id = args.get("id").and_then(|v| v.as_str()).unwrap_or("comp");
+
+    match name {
+        "create_text" => {
+            let text = args.get("text").and_then(|v| v.as_str()).unwrap_or("");
+            let usage_hint = args.get("usage_hint").and_then(|v| v.as_str());
+            let mut text_obj = json!({
+                "text": {"literalString": text}
+            });
+            if let Some(hint) = usage_hint {
+                text_obj["usageHint"] = json!(hint);
+            }
+            Some(json!({"id": id, "component": {"Text": text_obj}}))
+        }
+        "create_audio_player" => {
+            let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
+            let title = args.get("title").and_then(|v| v.as_str()).unwrap_or("Audio");
+            let artist = args.get("artist").and_then(|v| v.as_str());
+            let mut audio_obj = json!({
+                "url": {"literalString": url},
+                "title": {"literalString": title}
+            });
+            if let Some(a) = artist {
+                audio_obj["artist"] = json!({"literalString": a});
+            }
+            Some(json!({"id": id, "component": {"AudioPlayer": audio_obj}}))
+        }
+        "create_column" => {
+            let children = args.get("children").and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect::<Vec<_>>())
+                .unwrap_or_default();
+            Some(json!({"id": id, "component": {"Column": {"children": {"explicitList": children}}}}))
+        }
+        "create_row" => {
+            let children = args.get("children").and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect::<Vec<_>>())
+                .unwrap_or_default();
+            Some(json!({"id": id, "component": {"Row": {"children": {"explicitList": children}}}}))
+        }
+        "create_button" => {
+            let label = args.get("label").and_then(|v| v.as_str()).unwrap_or("Button");
+            let label_id = format!("{}-label", id);
+            Some(json!({"id": id, "component": {"Button": {"child": label_id, "primary": true}}}))
+        }
+        "create_card" => {
+            let child = args.get("child").and_then(|v| v.as_str()).unwrap_or("");
+            Some(json!({"id": id, "component": {"Card": {"child": child}}}))
+        }
+        "render_ui" => {
+            // This is the final layout - handled separately
+            None
+        }
+        _ => None
+    }
 }
 
 // ============================================================================
@@ -758,7 +1186,23 @@ Example flow for "create a volume control":
 4. create_row(id="volume-row", children=["volume-label", "volume-slider", "volume-value"])
 5. set_data(path="/volume", numberValue=50)
 6. set_data(path="/volumeDisplay", stringValue="50%")
-7. render_ui(rootId="volume-row")"#;
+7. render_ui(rootId="volume-row")
+
+MUSIC GENERATION:
+When the user asks you to generate music (e.g., "生成一首轻松的钢琴曲", "create relaxing music"):
+1. First call generate_music(prompt="description of the music", instrumental=true/false)
+2. The system will wait for Mureka AI to generate the music (~45 seconds)
+3. The audio URL will be provided to you automatically
+4. Then create an audio player: create_audio_player(id="player", url="<audio_url>", title="Song Title")
+5. Wrap it in a nice UI with a title and card
+6. Call render_ui() at the end
+
+Example for music generation:
+1. create_text(id="title", text="🎵 AI Generated Music", style="h1")
+2. generate_music(prompt="relaxing piano melody with soft ambient sounds", instrumental=true)
+3. create_audio_player(id="player", url="<will be filled>", title="Relaxing Piano")
+4. create_column(id="root", children=["title", "player"])
+5. render_ui(rootId="root")"#;
 
             let mut messages = vec![
                 json!({"role": "system", "content": system_prompt}),
@@ -773,8 +1217,8 @@ Example flow for "create a volume control":
             // Add new user message
             messages.push(json!({"role": "user", "content": chat_req.message}));
 
-            // Call Kimi API
-            match call_kimi(&state.api_key, messages.clone()).await {
+            // Call Kimi API with streaming (broadcasts components as they arrive)
+            match call_kimi_stream(&state.api_key, messages.clone(), &state.tx).await {
                 Ok(response) => {
                     if let Some(choice) = response.choices.first() {
                         // Log reasoning if present
@@ -793,6 +1237,60 @@ Example flow for "create a volume control":
                                     .unwrap_or(json!({}));
                                 println!("[Kimi Bridge] Tool: {}({})", tc.function.name, tc.function.arguments);
                                 builder.process_tool_call(&tc.function.name, &args);
+                            }
+
+                            // Handle pending music generation (only with mureka feature)
+                            #[cfg(feature = "mureka")]
+                            if builder.has_pending_music() {
+                                if let Some(ref mureka) = state.mureka_client {
+                                    println!("[Kimi Bridge] Processing music generation requests...");
+
+                                    for (prompt, instrumental) in builder.get_pending_music() {
+                                        println!("[Kimi Bridge] Generating music: '{}' (instrumental: {})", prompt, instrumental);
+
+                                        match mureka.generate_music(&prompt, instrumental).await {
+                                            Ok(job_id) => {
+                                                println!("[Kimi Bridge] Mureka job started: {}", job_id);
+                                                println!("[Kimi Bridge] Waiting for music generation (this may take ~45 seconds)...");
+
+                                                // Poll for completion (max 20 attempts = ~60 seconds)
+                                                match mureka.wait_for_completion(&job_id, 20).await {
+                                                    Ok(songs) => {
+                                                        println!("[Kimi Bridge] Music generated! {} songs available", songs.len());
+                                                        builder.set_generated_audio(songs.clone());
+
+                                                        // Update audio player components with real URLs
+                                                        if let Some(song) = songs.first() {
+                                                            if let Some(url) = &song.audio_url {
+                                                                println!("[Kimi Bridge] Audio URL: {}", url);
+                                                                // Find and update AudioPlayer components
+                                                                for comp in &mut builder.components {
+                                                                    if let Some(audio_player) = comp.get_mut("component")
+                                                                        .and_then(|c| c.get_mut("AudioPlayer"))
+                                                                    {
+                                                                        audio_player["url"] = json!({"literalString": url});
+                                                                        if let Some(title) = &song.title {
+                                                                            audio_player["title"] = json!({"literalString": title});
+                                                                        }
+                                                                        audio_player["artist"] = json!({"literalString": "Mureka AI"});
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        eprintln!("[Kimi Bridge] Music generation failed: {}", e);
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                eprintln!("[Kimi Bridge] Failed to start music generation: {}", e);
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    println!("[Kimi Bridge] Warning: Music generation requested but MUREKA_API_KEY not set");
+                                }
                             }
 
                             let a2ui_json = builder.build_a2ui_json();
@@ -868,13 +1366,21 @@ Example flow for "create a volume control":
 
         // SSE endpoint for Makepad client (A2A protocol compatible)
         (Method::POST, "/rpc") => {
-            // Return latest generated UI or welcome message
-            let ui_to_send = {
+            // Read from ui_live.json for real-time streaming updates
+            let ui_to_send = if let Ok(content) = std::fs::read_to_string("ui_live.json") {
+                if let Ok(json) = serde_json::from_str::<Value>(&content) {
+                    json
+                } else {
+                    // Fallback to latest_a2ui
+                    let latest = state.latest_a2ui.read().await;
+                    latest.clone().unwrap_or_else(|| json!([]))
+                }
+            } else {
+                // Fallback to latest_a2ui or default welcome
                 let latest = state.latest_a2ui.read().await;
                 if let Some(ref a2ui) = *latest {
                     a2ui.clone()
                 } else {
-                    // Default welcome UI
                     json!([
                         {"beginRendering": {"surfaceId": "main", "root": "welcome"}},
                         {"surfaceUpdate": {"surfaceId": "main", "components": [
@@ -924,31 +1430,39 @@ Example flow for "create a volume control":
                 .unwrap())
         }
 
-        // Live SSE endpoint for real-time updates
+        // Live SSE endpoint for real-time streaming updates
         (Method::GET, "/live") => {
             let mut rx = state.tx.subscribe();
+            let mut sse_body = String::new();
 
-            let sse_body = match tokio::time::timeout(
-                tokio::time::Duration::from_secs(30),
-                rx.recv()
-            ).await {
-                Ok(Ok(content)) => {
-                    // Parse and format as SSE
-                    if let Ok(messages) = serde_json::from_str::<Vec<Value>>(&content) {
-                        let mut response = String::new();
-                        for msg in messages {
-                            response.push_str(&format!("data: {}\n\n", msg));
+            // Keep receiving messages until timeout or channel closes
+            loop {
+                match tokio::time::timeout(
+                    tokio::time::Duration::from_secs(60),
+                    rx.recv()
+                ).await {
+                    Ok(Ok(content)) => {
+                        // Parse and format as SSE
+                        if let Ok(messages) = serde_json::from_str::<Vec<Value>>(&content) {
+                            for msg in messages {
+                                sse_body.push_str(&format!("data: {}\n\n", msg));
+                            }
+                        } else {
+                            sse_body.push_str(&format!("data: {}\n\n", content));
                         }
-                        response
-                    } else {
-                        format!("data: {}\n\n", content)
+                        println!("[Live SSE] Sent streaming update");
+                    }
+                    Ok(Err(_)) => {
+                        // Channel closed
+                        break;
+                    }
+                    Err(_) => {
+                        // Timeout - send keepalive and continue
+                        sse_body.push_str("data: {\"keepalive\": true}\n\n");
+                        break; // Exit after timeout for now
                     }
                 }
-                _ => {
-                    // Timeout - send keepalive
-                    "data: {\"keepalive\": true}\n\n".to_string()
-                }
-            };
+            }
 
             Ok(Response::builder()
                 .status(StatusCode::OK)
@@ -1027,10 +1541,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let api_key = std::env::var("MOONSHOT_API_KEY")
         .expect("MOONSHOT_API_KEY environment variable not set");
 
+    // Optional: Get Mureka API key for music generation (only with mureka feature)
+    #[cfg(feature = "mureka")]
+    let mureka_client = std::env::var("MUREKA_API_KEY")
+        .ok()
+        .map(|key| {
+            println!("[Kimi Bridge] Mureka API key found - music generation enabled");
+            MurekaClient::new(key)
+        });
+
+    #[cfg(feature = "mureka")]
+    if mureka_client.is_none() {
+        println!("[Kimi Bridge] MUREKA_API_KEY not set - music generation disabled");
+    }
+
+    #[cfg(not(feature = "mureka"))]
+    println!("[Kimi Bridge] Mureka feature not enabled - music generation disabled");
+
     let (tx, _rx) = broadcast::channel::<String>(16);
 
     let state = Arc::new(ServerState {
         api_key,
+        #[cfg(feature = "mureka")]
+        mureka_client,
         tx,
         conversation: RwLock::new(Vec::new()),
         latest_a2ui: RwLock::new(None),
@@ -1045,6 +1578,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!();
     println!("Server:   http://127.0.0.1:8081");
     println!("Model:    kimi-k2.5 (with tool use)");
+    #[cfg(feature = "mureka")]
+    println!("Music:    {} (set MUREKA_API_KEY to enable)",
+        if state.mureka_client.is_some() { "enabled" } else { "disabled" });
+    #[cfg(not(feature = "mureka"))]
+    println!("Music:    disabled (compile with --features mureka)");
     println!();
     println!("Endpoints:");
     println!("  POST /chat   - Send message to generate UI");
@@ -1057,6 +1595,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("  curl -X POST http://127.0.0.1:8081/chat \\");
     println!("    -H 'Content-Type: application/json' \\");
     println!("    -d '{{\"message\": \"Create a login form\"}}'");
+    println!();
+    println!("Music example:");
+    println!("  curl -X POST http://127.0.0.1:8081/chat \\");
+    println!("    -H 'Content-Type: application/json' \\");
+    println!("    -d '{{\"message\": \"生成一首轻松的钢琴曲\"}}'");
     println!();
     println!("Press Ctrl+C to stop");
     println!();

@@ -20,3 +20,7 @@ node_modules/
 debug/
 .cowork/
 *.log
+
+# Test files
+ui_live.json
+crates/a2ui-demo/resources/audio_*.mp3

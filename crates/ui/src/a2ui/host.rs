@@ -87,6 +87,60 @@ impl A2uiHost {
         Ok(())
     }
 
+    /// Connect to SSE endpoint using GET (for /live real-time streaming)
+    pub fn connect_sse(&mut self) -> Result<(), String> {
+        use super::sse::{SseClient, SseEvent};
+
+        let mut sse_client = SseClient::new(&self.config.url);
+        if let Some(token) = &self.config.auth_token {
+            sse_client = sse_client.auth(token);
+        }
+
+        // Start GET SSE stream
+        let rx = sse_client.get()?;
+
+        // Take sender for background thread
+        let tx = self.event_sender.take().ok_or("Already connected")?;
+
+        // Spawn thread to process SSE events
+        thread::spawn(move || {
+            let _ = tx.send(A2uiHostEvent::Connected);
+
+            while let Ok(event) = rx.recv() {
+                match event {
+                    SseEvent::Data(data) => {
+                        // Parse A2UI messages from SSE data
+                        if let Ok(messages) = serde_json::from_str::<Vec<serde_json::Value>>(&data) {
+                            for msg_value in messages {
+                                if let Ok(msg) = serde_json::from_value::<A2uiMessage>(msg_value) {
+                                    if tx.send(A2uiHostEvent::Message(msg)).is_err() {
+                                        return;
+                                    }
+                                }
+                            }
+                        } else if let Ok(msg) = serde_json::from_str::<A2uiMessage>(&data) {
+                            if tx.send(A2uiHostEvent::Message(msg)).is_err() {
+                                return;
+                            }
+                        }
+                    }
+                    SseEvent::Error(e) => {
+                        let _ = tx.send(A2uiHostEvent::Error(e));
+                    }
+                    SseEvent::Done => {
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+
+            let _ = tx.send(A2uiHostEvent::Disconnected);
+        });
+
+        self.is_connected = true;
+        Ok(())
+    }
+
     fn process_stream(mut stream: A2aEventStream, tx: Sender<A2uiHostEvent>) {
         // Send connected event
         let _ = tx.send(A2uiHostEvent::Connected);

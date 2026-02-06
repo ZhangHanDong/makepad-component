@@ -32,6 +32,8 @@ pub enum A2uiComponentType {
 
     // Visualization
     Chart,
+    // Media
+    AudioPlayer,
 }
 
 impl A2uiComponentType {
@@ -54,6 +56,7 @@ impl A2uiComponentType {
             A2uiComponentType::Modal => "Modal",
             A2uiComponentType::Tabs => "Tabs",
             A2uiComponentType::Chart => "Chart",
+            A2uiComponentType::AudioPlayer => "AudioPlayer",
         }
     }
 
@@ -76,6 +79,7 @@ impl A2uiComponentType {
             "Modal" => Some(A2uiComponentType::Modal),
             "Tabs" => Some(A2uiComponentType::Tabs),
             "Chart" => Some(A2uiComponentType::Chart),
+            "AudioPlayer" => Some(A2uiComponentType::AudioPlayer),
             _ => None,
         }
     }
@@ -99,6 +103,7 @@ impl A2uiComponentType {
             A2uiComponentType::Modal,
             A2uiComponentType::Tabs,
             A2uiComponentType::Chart,
+            A2uiComponentType::AudioPlayer,
         ]
     }
 }
@@ -271,6 +276,11 @@ impl ComponentRegistry {
             a2ui_type: A2uiComponentType::Chart,
             makepad_widget: "A2uiChart",
             description: "Chart visualization (bar, line, pie)",
+        // Media components
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::AudioPlayer,
+            makepad_widget: "A2uiAudioPlayer",
+            description: "Audio player with playback controls",
             implemented: true,
         });
 
@@ -346,6 +356,7 @@ pub fn component_type_of(component: &super::message::ComponentType) -> A2uiCompo
         ComponentType::Modal(_) => A2uiComponentType::Modal,
         ComponentType::Tabs(_) => A2uiComponentType::Tabs,
         ComponentType::Chart(_) => A2uiComponentType::Chart,
+        ComponentType::AudioPlayer(_) => A2uiComponentType::AudioPlayer,
     }
 }
 

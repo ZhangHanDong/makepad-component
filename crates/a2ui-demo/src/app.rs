@@ -5,9 +5,103 @@
 //! - Streaming mode: Connect to A2A server for payment checkout UI
 
 use makepad_component::a2ui::*;
+use makepad_component::widgets::button::MpButtonAction;
 use makepad_widgets::*;
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
+
+// ============================================================================
+// Theme System
+// ============================================================================
+
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub enum Theme {
+    #[default]
+    DarkPurple,
+    Light,
+    Soft,
+}
+
+impl Theme {
+    fn from_index(index: usize) -> Self {
+        match index {
+            0 => Theme::DarkPurple,
+            1 => Theme::Light,
+            2 => Theme::Soft,
+            _ => Theme::DarkPurple,
+        }
+    }
+
+    fn to_index(self) -> usize {
+        match self {
+            Theme::DarkPurple => 0,
+            Theme::Light => 1,
+            Theme::Soft => 2,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Theme::DarkPurple => "Dark Purple",
+            Theme::Light => "Cloud White",
+            Theme::Soft => "Soft Gray",
+        }
+    }
+}
+
+struct ThemeColors {
+    bg_primary: Vec4,
+    bg_surface: Vec4,
+    text_primary: Vec4,
+    text_secondary: Vec4,
+    accent: Vec4,
+    accent_secondary: Vec4,
+    status_color: Vec4,
+}
+
+impl Theme {
+    fn colors(self) -> ThemeColors {
+        match self {
+            Theme::DarkPurple => ThemeColors {
+                bg_primary: vec4(0.102, 0.102, 0.180, 1.0),      // #1a1a2e
+                bg_surface: vec4(0.133, 0.133, 0.267, 1.0),      // #222244
+                text_primary: vec4(1.0, 1.0, 1.0, 1.0),          // #FFFFFF
+                text_secondary: vec4(0.533, 0.533, 0.533, 1.0),  // #888888
+                accent: vec4(0.0, 0.4, 0.8, 1.0),                // #0066CC
+                accent_secondary: vec4(0.0, 0.667, 0.4, 1.0),    // #00AA66
+                status_color: vec4(0.298, 0.686, 0.314, 1.0),    // #4CAF50
+            },
+            Theme::Light => ThemeColors {
+                bg_primary: vec4(0.961, 0.961, 0.969, 1.0),      // #f5f5f7 (iOS-like)
+                bg_surface: vec4(1.0, 1.0, 1.0, 1.0),            // #FFFFFF
+                text_primary: vec4(0.11, 0.11, 0.118, 1.0),      // #1c1c1e
+                text_secondary: vec4(0.557, 0.557, 0.576, 1.0),  // #8e8e93
+                accent: vec4(0.0, 0.478, 1.0, 1.0),              // #007AFF (iOS blue)
+                accent_secondary: vec4(0.204, 0.78, 0.349, 1.0), // #34C759 (iOS green)
+                status_color: vec4(0.204, 0.78, 0.349, 1.0),     // #34C759
+            },
+            Theme::Soft => ThemeColors {
+                // Soft Gray - mid-tone between dark and light
+                bg_primary: vec4(0.435, 0.455, 0.490, 1.0),      // #6f7479 (medium gray-blue)
+                bg_surface: vec4(0.533, 0.553, 0.588, 1.0),      // #888d96 (lighter gray)
+                text_primary: vec4(1.0, 1.0, 1.0, 1.0),          // #FFFFFF
+                text_secondary: vec4(0.85, 0.85, 0.88, 1.0),     // #d9d9e0 (light gray)
+                accent: vec4(0.0, 0.4, 0.8, 1.0),                // #0066CC (same blue as Dark Purple)
+                accent_secondary: vec4(0.0, 0.667, 0.4, 1.0),    // #00AA66 (same green as Dark Purple)
+                status_color: vec4(0.298, 0.686, 0.314, 1.0),    // #4CAF50 (same green)
+            },
+        }
+    }
+
+    /// Get A2UI surface theme colors for this theme
+    fn a2ui_colors(self) -> A2uiThemeColors {
+        match self {
+            Theme::DarkPurple => A2uiThemeColors::dark_purple(),
+            Theme::Light => A2uiThemeColors::light(),
+            Theme::Soft => A2uiThemeColors::soft(),
+        }
+    }
+}
 
 live_design! {
     use link::theme::*;
@@ -16,6 +110,8 @@ live_design! {
 
     use makepad_component::theme::colors::*;
     use makepad_component::a2ui::surface::*;
+    use makepad_component::widgets::dropdown::*;
+    use makepad_component::widgets::button::*;
 
     // Main Application
     App = {{App}} {
@@ -25,49 +121,73 @@ live_design! {
                 width: Fill
                 height: Fill
 
-                draw_bg: {
-                    fn pixel(self) -> vec4 {
-                        return #1a1a2e;
-                    }
-                }
-
                 body = <View> {
                     width: Fill
                     height: Fill
                     flow: Down
                     padding: 20.0
                     spacing: 16.0
+                    show_bg: true
+                    draw_bg: { color: #1a1a2e }
 
-                    // Title - changes based on mode
-                    title_label = <Label> {
-                        text: "A2UI Demo"
-                        draw_text: {
-                            text_style: <THEME_FONT_BOLD> { font_size: 24.0 }
-                            color: #FFFFFF
+                    // Header row: Title on left, Theme dropdown on right
+                    header_row = <View> {
+                        width: Fill
+                        height: Fit
+                        flow: Right
+                        align: { y: 0.5 }
+
+                        // Title and description column
+                        <View> {
+                            width: Fill
+                            height: Fit
+                            flow: Down
+                            spacing: 4.0
+
+                            // Title - changes based on mode
+                            title_label = <Label> {
+                                text: "A2UI Demo"
+                                draw_text: {
+                                    text_style: <THEME_FONT_BOLD> { font_size: 24.0 }
+                                    color: #FFFFFF
+                                }
+                            }
+
+                            // Description
+                            desc_label = <Label> {
+                                text: "Static: Product Catalog | Streaming: Payment Checkout"
+                                draw_text: {
+                                    text_style: <THEME_FONT_REGULAR> { font_size: 14.0 }
+                                    color: #888888
+                                }
+                            }
                         }
-                    }
 
-                    // Description
-                    desc_label = <Label> {
-                        text: "Static: Product Catalog | Streaming: Payment Checkout"
-                        draw_text: {
-                            text_style: <THEME_FONT_REGULAR> { font_size: 14.0 }
-                            color: #888888
+                        // Theme dropdown in top-right corner
+                        theme_dropdown = <MpDropdownSmall> {
+                            width: Fit
+                            height: Fit
+                            labels: ["Dark Purple", "Cloud White", "Soft Gray"]
+                            selected_item: 0
                         }
                     }
 
                     // Control buttons row
-                    <View> {
+                    controls_row = <View> {
                         width: Fill
                         height: Fit
                         flow: Right
                         spacing: 10.0
 
                         // Load static data button
-                        load_btn = <Button> {
+                        load_btn = <MpButton> {
                             text: "🛒 Product Catalog"
                             draw_text: { color: #FFFFFF }
-                            draw_bg: { color: #0066CC }
+                            draw_bg: {
+                                color: #0066CC
+                                color_hover: #0055AA
+                                color_pressed: #004488
+                            }
                         }
 
                         // Math charts demo button
@@ -78,10 +198,14 @@ live_design! {
                         }
 
                         // Connect to server button
-                        connect_btn = <Button> {
+                        connect_btn = <MpButton> {
                             text: "🎨 Live Editor"
                             draw_text: { color: #FFFFFF }
-                            draw_bg: { color: #00AA66 }
+                            draw_bg: {
+                                color: #00AA66
+                                color_hover: #009955
+                                color_pressed: #008844
+                            }
                         }
 
                         // Server URL input
@@ -101,7 +225,7 @@ live_design! {
                     }
 
                     // A2UI Surface container with scroll
-                    <ScrollYView> {
+                    surface_container = <ScrollYView> {
                         width: Fill
                         height: Fill
                         show_bg: true
@@ -137,6 +261,10 @@ pub struct App {
     #[rust]
     host: Option<A2uiHost>,
 
+    /// Live SSE connection for real-time streaming updates
+    #[rust]
+    live_host: Option<A2uiHost>,
+
     #[rust]
     is_streaming: bool,
 
@@ -151,6 +279,11 @@ pub struct App {
 
     #[rust]
     poll_timer: Timer,
+    current_theme: Theme,
+
+    /// Currently playing audio URL (None = not playing)
+    #[rust]
+    playing_audio_component_id: Option<String>,
 }
 
 impl LiveRegister for App {
@@ -161,10 +294,142 @@ impl LiveRegister for App {
 }
 
 impl App {
+    /// Apply the current theme colors to all UI elements
+    fn apply_theme(&mut self, cx: &mut Cx) {
+        let colors = self.current_theme.colors();
+
+        // Apply body background (main container)
+        self.ui.view(ids!(body)).apply_over(cx, live! {
+            draw_bg: { color: (colors.bg_primary) }
+        });
+
+        // Apply header row background (in case it needs distinction)
+        self.ui.view(ids!(header_row)).apply_over(cx, live! {
+            draw_bg: { color: (colors.bg_primary) }
+        });
+
+        // Apply controls row background
+        self.ui.view(ids!(controls_row)).apply_over(cx, live! {
+            draw_bg: { color: (colors.bg_primary) }
+        });
+
+        // Apply title color
+        self.ui.label(ids!(title_label)).apply_over(cx, live! {
+            draw_text: { color: (colors.text_primary) }
+        });
+
+        // Apply description color
+        self.ui.label(ids!(desc_label)).apply_over(cx, live! {
+            draw_text: { color: (colors.text_secondary) }
+        });
+
+        // Apply button colors - keep text white for contrast
+        let white = vec4(1.0, 1.0, 1.0, 1.0);
+
+        // Calculate hover/pressed colors (slightly darker versions)
+        let accent_hover = vec4(
+            colors.accent.x * 0.85,
+            colors.accent.y * 0.85,
+            colors.accent.z * 0.85,
+            1.0
+        );
+        let accent_pressed = vec4(
+            colors.accent.x * 0.7,
+            colors.accent.y * 0.7,
+            colors.accent.z * 0.7,
+            1.0
+        );
+        let secondary_hover = vec4(
+            colors.accent_secondary.x * 0.85,
+            colors.accent_secondary.y * 0.85,
+            colors.accent_secondary.z * 0.85,
+            1.0
+        );
+        let secondary_pressed = vec4(
+            colors.accent_secondary.x * 0.7,
+            colors.accent_secondary.y * 0.7,
+            colors.accent_secondary.z * 0.7,
+            1.0
+        );
+
+        self.ui.button(ids!(load_btn)).apply_over(cx, live! {
+            draw_bg: {
+                color: (colors.accent)
+                color_hover: (accent_hover)
+                color_pressed: (accent_pressed)
+            }
+            draw_text: { color: (white) }
+        });
+
+        self.ui.button(ids!(connect_btn)).apply_over(cx, live! {
+            draw_bg: {
+                color: (colors.accent_secondary)
+                color_hover: (secondary_hover)
+                color_pressed: (secondary_pressed)
+            }
+            draw_text: { color: (white) }
+        });
+
+        // Apply server URL label color
+        self.ui.label(ids!(server_url)).apply_over(cx, live! {
+            draw_text: { color: (colors.text_secondary) }
+        });
+
+        // Apply status label color
+        self.ui.label(ids!(status_label)).apply_over(cx, live! {
+            draw_text: { color: (colors.status_color) }
+        });
+
+        // Apply surface container background
+        self.ui.view(ids!(surface_container)).apply_over(cx, live! {
+            draw_bg: { color: (colors.bg_surface) }
+        });
+
+        // Apply theme-appropriate dropdown styling
+        let is_light = self.current_theme == Theme::Light;
+        let dropdown_text = if is_light {
+            vec4(0.04, 0.04, 0.04, 1.0)  // dark text
+        } else {
+            vec4(1.0, 1.0, 1.0, 1.0)     // white text
+        };
+        let dropdown_bg = if is_light {
+            vec4(1.0, 1.0, 1.0, 1.0)     // white bg
+        } else {
+            vec4(0.2, 0.2, 0.33, 1.0)    // dark purple bg
+        };
+        let dropdown_border = if is_light {
+            vec4(0.83, 0.83, 0.83, 1.0)  // light border
+        } else {
+            vec4(0.33, 0.33, 0.47, 1.0)  // dark border
+        };
+
+        self.ui.drop_down(ids!(theme_dropdown)).apply_over(cx, live! {
+            draw_text: { color: (dropdown_text) }
+            draw_bg: {
+                color: (dropdown_bg)
+                border_color: (dropdown_border)
+            }
+        });
+
+        // Apply theme to A2UI surface content
+        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
+            let a2ui_colors = self.current_theme.a2ui_colors();
+            surface.set_theme_colors(cx, &a2ui_colors);
+        }
+
+        self.ui.redraw(cx);
+    }
+
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
-        // Handle "Load Static Data" button click
-        if self.ui.button(ids!(load_btn)).clicked(&actions) {
-            self.load_a2ui_data(cx);
+        // Handle theme dropdown selection
+        if let Some(index) = self.ui.drop_down(ids!(theme_dropdown)).selected(&actions) {
+            let new_theme = Theme::from_index(index);
+            if new_theme != self.current_theme {
+                self.current_theme = new_theme;
+                self.apply_theme(cx);
+                log!("Theme changed to: {:?}", self.current_theme);
+            }
         }
 
         // Handle "Math Charts" button click
@@ -175,6 +440,20 @@ impl App {
         // Handle "Connect to Server" button click
         if self.ui.button(ids!(connect_btn)).clicked(&actions) {
             self.connect_to_server(cx);
+        // Handle "Load Static Data" button click (MpButton)
+        let load_btn_ref = self.ui.widget(ids!(load_btn));
+        if let Some(item) = actions.find_widget_action(load_btn_ref.widget_uid()) {
+            if matches!(item.cast::<MpButtonAction>(), MpButtonAction::Clicked) {
+                self.load_a2ui_data(cx);
+            }
+        }
+
+        // Handle "Connect to Server" button click (MpButton)
+        let connect_btn_ref = self.ui.widget(ids!(connect_btn));
+        if let Some(item) = actions.find_widget_action(connect_btn_ref.widget_uid()) {
+            if matches!(item.cast::<MpButtonAction>(), MpButtonAction::Clicked) {
+                self.connect_to_server(cx);
+            }
         }
 
         // Handle A2UI surface actions
@@ -223,6 +502,102 @@ impl App {
                                 &format!("🎯 Action: {}", user_action.action.name),
                             );
                         }
+                    }
+                    self.ui.redraw(cx);
+                }
+                A2uiSurfaceAction::PlayAudio { component_id, url, title } => {
+                    // Toggle: if same component is playing, stop it
+                    if self.playing_audio_component_id.as_ref() == Some(&component_id) {
+                        // Stop playing
+                        #[cfg(target_os = "macos")]
+                        {
+                            let _ = std::process::Command::new("pkill")
+                                .args(["-9", "afplay"])
+                                .status();
+                        }
+                        self.playing_audio_component_id = None;
+
+                        // Update surface state for button display
+                        let surface = self.ui.a2ui_surface(ids!(a2ui_surface));
+                        surface.set_playing_component(None);
+
+                        self.ui.label(ids!(status_label)).set_text(
+                            cx,
+                            &format!("⏹ Stopped: {}", title),
+                        );
+                        log!("Stopped: {}", title);
+                    } else {
+                        // Stop any current playback first
+                        #[cfg(target_os = "macos")]
+                        {
+                            let _ = std::process::Command::new("pkill")
+                                .args(["-9", "afplay"])
+                                .status();
+                        }
+
+                        log!("PlayAudio: {} - {}", title, url);
+                        self.playing_audio_component_id = Some(component_id.clone());
+
+                        // Update surface state for button display
+                        let surface = self.ui.a2ui_surface(ids!(a2ui_surface));
+                        surface.set_playing_component(Some(component_id.clone()));
+
+                        self.ui.label(ids!(status_label)).set_text(
+                            cx,
+                            &format!("🎵 Playing: {}", title),
+                        );
+
+                        // Download to resources directory and play
+                        let title_clone = title.clone();
+                        let url_clone = url.clone();
+                        std::thread::spawn(move || {
+                            // Determine file extension from URL
+                            let ext = if url_clone.contains(".mp4") { "mp4" }
+                                else if url_clone.contains(".mp3") { "mp3" }
+                                else { "mp3" };
+
+                            let filename = format!("audio_{}.{}",
+                                title_clone.chars().filter(|c| c.is_alphanumeric()).collect::<String>(),
+                                ext
+                            );
+                            let download_path = format!("crates/a2ui-demo/resources/{}", filename);
+
+                            log!("Downloading {} to {}", url_clone, download_path);
+
+                            // Download using curl
+                            let status = std::process::Command::new("curl")
+                                .args(["-L", "-o", &download_path, &url_clone])
+                                .status();
+
+                            match status {
+                                Ok(s) if s.success() => {
+                                    log!("Download complete: {}", download_path);
+
+                                    // Play with system player
+                                    #[cfg(target_os = "macos")]
+                                    {
+                                        let _ = std::process::Command::new("afplay")
+                                            .arg(&download_path)
+                                            .spawn();
+                                    }
+                                    #[cfg(target_os = "linux")]
+                                    {
+                                        let _ = std::process::Command::new("aplay")
+                                            .arg(&download_path)
+                                            .spawn();
+                                    }
+                                    #[cfg(target_os = "windows")]
+                                    {
+                                        let _ = std::process::Command::new("cmd")
+                                            .args(["/C", "start", "", &download_path])
+                                            .spawn();
+                                    }
+                                }
+                                _ => {
+                                    log!("Download failed");
+                                }
+                            }
+                        });
                     }
                     self.ui.redraw(cx);
                 }
@@ -280,6 +655,10 @@ impl App {
             log!("connect_to_server: Clearing existing host");
             self.host = None;
         }
+        if self.live_host.is_some() {
+            log!("connect_to_server: Clearing existing live_host");
+            self.live_host = None;
+        }
 
         // Clear surface BEFORE connecting - this ensures a fresh start
         // The BeginRendering message will create a new surface
@@ -291,6 +670,7 @@ impl App {
         // Update title for streaming mode
         self.ui.label(ids!(title_label)).set_text(cx, "🎨 Live A2UI Editor");
 
+        // Connect to /rpc for initial UI load
         let config = A2uiHostConfig {
             url: "http://localhost:8082/rpc".to_string(),
             auth_token: None,
@@ -306,6 +686,9 @@ impl App {
                 self.live_mode = true;
                 self.last_poll_time = cx.seconds_since_app_start();
                 self.loaded = false;
+
+                // Also connect to /live for real-time streaming updates
+                self.connect_live_stream(cx);
             }
             Err(e) => {
                 self.ui.label(ids!(status_label)).set_text(cx, &format!("❌ Connection failed: {}", e));
@@ -313,6 +696,27 @@ impl App {
         }
 
         self.ui.redraw(cx);
+    }
+
+    fn connect_live_stream(&mut self, _cx: &mut Cx) {
+        // Connect to /live SSE endpoint for real-time component updates (using GET)
+        let live_config = A2uiHostConfig {
+            url: "http://localhost:8081/live".to_string(),
+            auth_token: None,
+        };
+
+        let mut live_host = A2uiHost::new(live_config);
+
+        // Use connect_sse for GET-based SSE connection
+        match live_host.connect_sse() {
+            Ok(()) => {
+                log!("🔴 Connected to /live SSE for real-time streaming");
+                self.live_host = Some(live_host);
+            }
+            Err(e) => {
+                log!("Failed to connect to /live: {}", e);
+            }
+        }
     }
 
     fn reconnect_live(&mut self, cx: &mut Cx) {
@@ -437,6 +841,52 @@ impl App {
             if !self.live_mode {
                 self.ui.label(ids!(status_label)).set_text(cx, "⚫ Disconnected from server");
                 needs_redraw = true;
+            }
+        }
+
+        if needs_redraw {
+            self.ui.redraw(cx);
+        }
+    }
+
+    /// Poll for real-time streaming updates from /live SSE endpoint
+    fn poll_live_host(&mut self, cx: &mut Cx) {
+        let Some(live_host) = &mut self.live_host else {
+            return;
+        };
+
+        let events = live_host.poll_all();
+        if events.is_empty() {
+            return;
+        }
+
+        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let mut needs_redraw = false;
+
+        for event in events {
+            match event {
+                A2uiHostEvent::Connected => {
+                    log!("Live stream connected - ready for real-time updates");
+                }
+                A2uiHostEvent::Message(msg) => {
+                    log!("🔴 LIVE: Received streaming component: {:?}", msg);
+                    if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
+                        let events = surface.process_message(msg);
+                        log!("🔴 LIVE: Processed {} events", events.len());
+                    }
+                    self.ui.label(ids!(status_label)).set_text(cx, "🔴 Streaming component...");
+                    needs_redraw = true;
+                }
+                A2uiHostEvent::TaskStatus { task_id: _, state } => {
+                    log!("Live stream task status: {}", state);
+                }
+                A2uiHostEvent::Error(e) => {
+                    log!("Live stream error: {}", e);
+                }
+                A2uiHostEvent::Disconnected => {
+                    log!("Live stream disconnected, will reconnect...");
+                    self.live_host = None;
+                }
             }
         }
 
@@ -578,6 +1028,38 @@ impl AppMain for App {
                 // Only reconnect if we haven't loaded data yet
                 self.reconnect_live(cx);
             }
+        // Apply theme and auto-connect to live server on startup
+        if let Event::Startup = event {
+            self.apply_theme(cx);
+            self.connect_to_server(cx);
+        }
+
+        // Poll for streaming messages when connected
+        if self.host.is_some() {
+            self.poll_host(cx);
+        }
+
+        // Poll for real-time streaming updates from /live
+        if self.live_host.is_some() {
+            self.poll_live_host(cx);
+        }
+
+        // Live mode: keep the event loop running for polling
+        if self.live_mode {
+            if self.host.is_none() {
+                // Reconnect periodically to get updates
+                let current_time = cx.seconds_since_app_start();
+                if current_time - self.last_poll_time > 0.2 {
+                    self.last_poll_time = current_time;
+                    self.reconnect_live(cx);
+                }
+            }
+            // Reconnect live stream if disconnected
+            if self.live_host.is_none() {
+                self.connect_live_stream(cx);
+            }
+            // Always request next frame to keep polling loop active
+            cx.new_next_frame();
         }
 
         // Capture actions from UI event handling

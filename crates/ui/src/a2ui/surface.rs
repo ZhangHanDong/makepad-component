@@ -17,6 +17,97 @@ use super::{
 };
 
 // ============================================================================
+// A2UI Theme Colors
+// ============================================================================
+
+/// Theme colors for A2UI surface and its components
+#[derive(Clone, Copy, Debug)]
+pub struct A2uiThemeColors {
+    /// Background color for the surface
+    pub bg_surface: Vec4,
+    /// Background color for cards
+    pub bg_card: Vec4,
+    /// Border color for cards, inputs, etc.
+    pub border_color: Vec4,
+    /// Primary text color
+    pub text_primary: Vec4,
+    /// Secondary/muted text color
+    pub text_secondary: Vec4,
+    /// Accent/primary button color
+    pub accent: Vec4,
+    /// Accent hover color
+    pub accent_hover: Vec4,
+    /// Accent pressed color
+    pub accent_pressed: Vec4,
+    /// Input field background color
+    pub input_bg: Vec4,
+    /// Slider track color
+    pub slider_track: Vec4,
+    /// Checkbox/slider fill color
+    pub control_fill: Vec4,
+}
+
+impl Default for A2uiThemeColors {
+    fn default() -> Self {
+        // Default dark purple theme
+        Self {
+            bg_surface: vec4(0.102, 0.102, 0.180, 1.0),      // #1a1a2e
+            bg_card: vec4(0.165, 0.227, 0.353, 1.0),         // #2a3a5a
+            border_color: vec4(0.333, 0.533, 0.733, 1.0),    // #5588bb
+            text_primary: vec4(1.0, 1.0, 1.0, 1.0),          // #FFFFFF
+            text_secondary: vec4(0.533, 0.533, 0.533, 1.0),  // #888888
+            accent: vec4(0.231, 0.51, 0.965, 1.0),           // #3B82F6
+            accent_hover: vec4(0.145, 0.388, 0.922, 1.0),    // slightly darker
+            accent_pressed: vec4(0.114, 0.306, 0.847, 1.0),  // even darker
+            input_bg: vec4(0.165, 0.227, 0.353, 1.0),        // #2a3a5a
+            slider_track: vec4(0.227, 0.290, 0.416, 1.0),    // #3a4a6a
+            control_fill: vec4(0.231, 0.51, 0.965, 1.0),     // #3B82F6
+        }
+    }
+}
+
+impl A2uiThemeColors {
+    /// Create dark purple theme colors (default)
+    pub fn dark_purple() -> Self {
+        Self::default()
+    }
+
+    /// Create light iOS-like theme colors
+    pub fn light() -> Self {
+        Self {
+            bg_surface: vec4(1.0, 1.0, 1.0, 1.0),            // #FFFFFF
+            bg_card: vec4(0.96, 0.96, 0.97, 1.0),            // #f5f5f8
+            border_color: vec4(0.85, 0.85, 0.87, 1.0),       // #d9d9de
+            text_primary: vec4(0.11, 0.11, 0.118, 1.0),      // #1c1c1e
+            text_secondary: vec4(0.557, 0.557, 0.576, 1.0),  // #8e8e93
+            accent: vec4(0.0, 0.478, 1.0, 1.0),              // #007AFF
+            accent_hover: vec4(0.0, 0.4, 0.85, 1.0),         // slightly darker
+            accent_pressed: vec4(0.0, 0.35, 0.75, 1.0),      // even darker
+            input_bg: vec4(0.95, 0.95, 0.97, 1.0),           // light gray
+            slider_track: vec4(0.9, 0.9, 0.92, 1.0),         // light gray
+            control_fill: vec4(0.0, 0.478, 1.0, 1.0),        // #007AFF
+        }
+    }
+
+    /// Create soft gray mid-tone theme colors
+    pub fn soft() -> Self {
+        Self {
+            bg_surface: vec4(0.533, 0.553, 0.588, 1.0),      // #888d96
+            bg_card: vec4(0.6, 0.62, 0.66, 1.0),             // slightly lighter
+            border_color: vec4(0.7, 0.72, 0.76, 1.0),        // light border
+            text_primary: vec4(1.0, 1.0, 1.0, 1.0),          // #FFFFFF
+            text_secondary: vec4(0.2, 0.2, 0.25, 1.0),       // dark gray for contrast
+            accent: vec4(0.231, 0.51, 0.965, 1.0),           // #3B82F6 (vibrant blue)
+            accent_hover: vec4(0.145, 0.388, 0.922, 1.0),    // slightly darker
+            accent_pressed: vec4(0.114, 0.306, 0.847, 1.0),  // even darker
+            input_bg: vec4(0.5, 0.52, 0.56, 1.0),            // medium gray
+            slider_track: vec4(0.45, 0.47, 0.51, 1.0),       // darker gray
+            control_fill: vec4(0.231, 0.51, 0.965, 1.0),     // #3B82F6 (vibrant blue)
+        }
+    }
+}
+
+// ============================================================================
 // A2UI Surface Actions
 // ============================================================================
 
@@ -31,6 +122,12 @@ pub enum A2uiSurfaceAction {
         surface_id: String,
         path: String,
         value: serde_json::Value,
+    },
+    /// Audio player play button clicked - open URL in browser
+    PlayAudio {
+        component_id: String,
+        url: String,
+        title: String,
     },
 }
 
@@ -342,6 +439,48 @@ live_design! {
 
             let alpha = aa * self.opacity;
             return vec4(self.color.rgb * self.color.a * alpha, self.color.a * alpha);
+    // A2UI Audio Bars - Neon waveform visualization for audio player
+    // ============================================================================
+    DrawAudioBars = {{DrawAudioBars}} {
+        fn pixel(self) -> vec4 {
+            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+
+            // Draw dark background with rounded corners
+            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 4.0);
+            sdf.fill(vec4(0.08, 0.08, 0.15, 0.9));
+
+            // 5 bars configuration
+            let num_bars = 5.0;
+            let gap = 3.0;
+            let padding = 4.0;
+            let usable_width = self.rect_size.x - padding * 2.0;
+            let bar_width = (usable_width - gap * (num_bars - 1.0)) / num_bars;
+
+            // Draw each bar
+            for i in 0..5 {
+                let fi = float(i);
+                let x = padding + fi * (bar_width + gap);
+
+                // Dynamic height based on time and bar index
+                let phase = fi * 1.2;
+                let wave = sin(self.time * 5.0 + phase) * 0.5 + 0.5;
+                let bar_max_height = self.rect_size.y - padding * 2.0;
+                let height = mix(0.2, wave, self.is_playing) * bar_max_height;
+
+                // Neon gradient: cyan → purple → pink
+                let t = fi / 4.0;
+                let cyan = vec3(0.0, 1.0, 1.0);
+                let purple = vec3(0.5, 0.0, 1.0);
+                let pink = vec3(1.0, 0.2, 0.6);
+                let color = mix(mix(cyan, purple, t), pink, t * t);
+
+                // Draw bar from bottom
+                let y = self.rect_size.y - padding - height;
+                sdf.box(x, y, bar_width, height, 1.5);
+                sdf.fill(vec4(color, 1.0));
+            }
+
+            return sdf.result;
         }
     }
 
@@ -542,6 +681,8 @@ live_design! {
         plot_surface3d: <Surface3D> {}
         plot_scatter3d: <Scatter3D> {}
         plot_line3d: <Line3D> {}
+        // Audio bars visualization
+        draw_audio_bars: <DrawAudioBars> {}
 
         // Image resources
         img_headphones: dep("crate://self/resources/headphones.jpg")
@@ -787,6 +928,7 @@ pub struct DrawA2uiArc {
 
 // ============================================================================
 // DrawA2uiQuad - arbitrary convex quadrilateral with AA edges (chord chart)
+// DrawAudioBars - for rendering audio waveform visualization
 // ============================================================================
 
 #[derive(Live, LiveHook, LiveRegister)]
@@ -815,6 +957,11 @@ pub struct DrawA2uiQuad {
     pub p3x: f32,
     #[live(1.0)]
     pub p3y: f32,
+pub struct DrawAudioBars {
+    #[deref]
+    draw_super: DrawQuad,
+    #[live(0.0)]
+    pub is_playing: f32,
 }
 
 // ============================================================================
@@ -950,6 +1097,10 @@ pub struct A2uiSurface {
     #[live] plot_surface3d: Surface3D,
     #[live] plot_scatter3d: Scatter3D,
     #[live] plot_line3d: Line3D,
+    /// Draw audio bars visualization
+    #[redraw]
+    #[live]
+    draw_audio_bars: DrawAudioBars,
 
     /// Image sources (preloaded)
     #[live]
@@ -1074,6 +1225,26 @@ pub struct A2uiSurface {
     /// Currently hovered slider index
     #[rust]
     hovered_slider_idx: Option<usize>,
+
+    // ============================================================================
+    // AudioPlayer state tracking
+    // ============================================================================
+
+    /// AudioPlayer button areas for event detection (play buttons)
+    #[rust]
+    audio_player_areas: Vec<Area>,
+
+    /// AudioPlayer metadata: (component_id, audio_url, title)
+    #[rust]
+    audio_player_data: Vec<(String, String, String)>,
+
+    /// Currently hovered audio player index
+    #[rust]
+    hovered_audio_player_idx: Option<usize>,
+
+    /// Currently playing audio component ID (for Play/Stop toggle)
+    #[rust]
+    playing_component_id: Option<String>,
 }
 
 impl A2uiSurface {
@@ -1088,6 +1259,74 @@ impl A2uiSurface {
     pub fn clear(&mut self) {
         // Reset the processor to clear all surfaces and components
         self.processor = Some(A2uiMessageProcessor::with_standard_catalog());
+    }
+
+    /// Apply theme colors to all A2UI components
+    pub fn set_theme_colors(&mut self, cx: &mut Cx, colors: &A2uiThemeColors) {
+        // Apply surface background
+        self.draw_bg.apply_over(cx, live! {
+            bg_color: (colors.bg_surface)
+        });
+
+        // Apply text colors
+        self.draw_text.apply_over(cx, live! {
+            color: (colors.text_primary)
+        });
+
+        self.draw_card_text.apply_over(cx, live! {
+            color: (colors.text_primary)
+        });
+
+        // Apply card colors
+        self.draw_card.apply_over(cx, live! {
+            color: (colors.bg_card)
+            border_color: (colors.border_color)
+        });
+
+        // Apply button colors - the shader uses hardcoded colors, so we update via instance
+        self.draw_button.apply_over(cx, live! {
+            color: (colors.accent)
+        });
+
+        self.draw_button_text.apply_over(cx, live! {
+            color: (vec4(1.0, 1.0, 1.0, 1.0))
+        });
+
+        // Apply text field colors
+        self.draw_text_field.apply_over(cx, live! {
+            bg_color: (colors.input_bg)
+            border_color: (colors.border_color)
+        });
+
+        self.draw_text_field_text.apply_over(cx, live! {
+            color: (colors.text_primary)
+        });
+
+        self.draw_text_field_placeholder.apply_over(cx, live! {
+            color: (colors.text_secondary)
+        });
+
+        // Apply checkbox colors
+        self.draw_checkbox.apply_over(cx, live! {
+            bg_color: (colors.input_bg)
+            border_color: (colors.border_color)
+            check_color: (colors.control_fill)
+        });
+
+        self.draw_checkbox_label.apply_over(cx, live! {
+            color: (colors.text_primary)
+        });
+
+        // Apply slider colors
+        self.draw_slider_track.apply_over(cx, live! {
+            track_color: (colors.slider_track)
+            fill_color: (colors.control_fill)
+        });
+
+        // Apply image placeholder text
+        self.draw_image_text.apply_over(cx, live! {
+            color: (colors.text_secondary)
+        });
     }
 
     /// Load image textures from LiveDependency resources
@@ -1180,6 +1419,16 @@ impl A2uiSurface {
     /// Get mutable processor
     pub fn processor_mut(&mut self) -> Option<&mut A2uiMessageProcessor> {
         self.processor.as_mut()
+    }
+
+    /// Set the currently playing audio component ID (for Play/Stop toggle display)
+    pub fn set_playing_component(&mut self, component_id: Option<String>) {
+        self.playing_component_id = component_id;
+    }
+
+    /// Get the currently playing audio component ID
+    pub fn playing_component_id(&self) -> Option<&String> {
+        self.playing_component_id.as_ref()
     }
 
     /// Process A2UI JSON messages
@@ -1434,6 +1683,45 @@ impl Widget for A2uiSurface {
             }
         }
 
+        // Handle audio player events
+        for (idx, area) in self.audio_player_areas.iter().enumerate() {
+            match event.hits(cx, *area) {
+                Hit::FingerHoverIn(_) => {
+                    if self.hovered_audio_player_idx != Some(idx) {
+                        self.hovered_audio_player_idx = Some(idx);
+                        cx.set_cursor(MouseCursor::Hand);
+                        needs_redraw = true;
+                    }
+                }
+                Hit::FingerHoverOut(_) => {
+                    if self.hovered_audio_player_idx == Some(idx) {
+                        self.hovered_audio_player_idx = None;
+                        cx.set_cursor(MouseCursor::Default);
+                        needs_redraw = true;
+                    }
+                }
+                Hit::FingerDown(_) => {
+                    log!("[AudioPlayer] Click idx={}", idx);
+                    self.hovered_audio_player_idx = Some(idx);
+                    // Trigger play immediately on FingerDown
+                    if let Some((component_id, url, title)) = self.audio_player_data.get(idx).cloned() {
+                        log!("[AudioPlayer] Emitting PlayAudio: {} - {}", title, url);
+                        cx.widget_action(
+                            self.widget_uid(),
+                            &scope.path,
+                            A2uiSurfaceAction::PlayAudio {
+                                component_id,
+                                url,
+                                title,
+                            },
+                        );
+                    }
+                    needs_redraw = true;
+                }
+                _ => {}
+            }
+        }
+
         // Handle slider events
         for (idx, area) in self.slider_areas.iter().enumerate() {
             match event.hits(cx, *area) {
@@ -1526,6 +1814,7 @@ impl Widget for A2uiSurface {
         self.text_field_data.clear();
         self.checkbox_data.clear();
         self.slider_data.clear();
+        self.audio_player_data.clear();
 
         self.draw_bg.begin(cx, walk, self.layout);
 
@@ -1581,6 +1870,11 @@ impl Widget for A2uiSurface {
         let current_slider_count = self.slider_data.len();
         if current_slider_count < self.slider_areas.len() {
             self.slider_areas.truncate(current_slider_count);
+        }
+
+        let current_audio_player_count = self.audio_player_data.len();
+        if current_audio_player_count < self.audio_player_areas.len() {
+            self.audio_player_areas.truncate(current_audio_player_count);
         }
 
         self.draw_bg.end(cx);
@@ -1640,6 +1934,8 @@ impl A2uiSurface {
             }
             ComponentType::Chart(chart) => {
                 self.render_chart(cx, scope, chart, data_model);
+            ComponentType::AudioPlayer(audio_player) => {
+                self.render_audio_player(cx, audio_player, data_model, component_id);
             }
             _ => {
                 // Unsupported component - skip for now
@@ -2773,6 +3069,198 @@ impl A2uiSurface {
         cx.end_turtle();
     }
 
+    // AudioPlayer Rendering
+    // ============================================================================
+
+    fn render_audio_player(
+        &mut self,
+        cx: &mut Cx2d,
+        audio_player: &AudioPlayerComponent,
+        data_model: &DataModel,
+        component_id: &str,
+    ) {
+        let audio_player_idx = self.audio_player_data.len();
+        let is_hovered = self.hovered_audio_player_idx == Some(audio_player_idx);
+
+        // Resolve URL and title
+        let url = resolve_string_value_scoped(
+            &audio_player.url,
+            data_model,
+            self.current_scope.as_deref(),
+        );
+
+        // Check if this audio component is currently playing
+        let is_playing = self.playing_component_id.as_ref().map(|s| s.as_str()) == Some(component_id);
+
+        let title = audio_player
+            .title
+            .as_ref()
+            .map(|t| resolve_string_value_scoped(t, data_model, self.current_scope.as_deref()))
+            .unwrap_or_else(|| "Audio".to_string());
+
+        let artist = audio_player
+            .artist
+            .as_ref()
+            .map(|a| resolve_string_value_scoped(a, data_model, self.current_scope.as_deref()));
+
+        // Check if we're already inside a Card - avoid nested card backgrounds
+        let already_in_card = self.inside_card;
+
+        // Only create card background if not already inside a card
+        if !already_in_card {
+            let walk = Walk {
+                width: Size::fill(),
+                height: Size::fit(),
+                margin: Margin { top: 8.0, bottom: 8.0, left: 0.0, right: 0.0 },
+                ..Walk::default()
+            };
+            let layout = Layout {
+                flow: Flow::Down,
+                padding: Padding {
+                    left: 16.0,
+                    right: 16.0,
+                    top: 12.0,
+                    bottom: 12.0,
+                },
+                spacing: 8.0,
+                ..Layout::default()
+            };
+            self.draw_card.begin(cx, walk, layout);
+            self.inside_card = true;
+        } else {
+            // When inside a card, create a container for audio player content
+            let walk = Walk::fill_fit();
+            let layout = Layout {
+                flow: Flow::Down,
+                spacing: 8.0,
+                ..Layout::default()
+            };
+            cx.begin_turtle(walk, layout);
+        }
+
+        // Title row with audio bars
+        let title_walk = Walk::fill_fit();
+        let title_layout = Layout {
+            flow: Flow::right(),
+            spacing: 8.0,
+            align: Align { x: 0.0, y: 0.5 },
+            ..Layout::default()
+        };
+        cx.begin_turtle(title_walk, title_layout);
+
+        // Music icon (🎵)
+        self.draw_card_text.text_style.font_size = 20.0;
+        self.draw_card_text.draw_walk(cx, Walk::fit(), Align::default(), "🎵");
+
+        // Title and artist column (flexible width, not fill)
+        let info_walk = Walk::fit();
+        let info_layout = Layout {
+            flow: Flow::Down,
+            spacing: 2.0,
+            ..Layout::default()
+        };
+        cx.begin_turtle(info_walk, info_layout);
+
+        // Title
+        self.draw_card_text.text_style.font_size = 16.0;
+        self.draw_card_text.draw_walk(cx, Walk::fit(), Align::default(), &title);
+
+        // Artist (if present)
+        if let Some(artist_name) = &artist {
+            self.draw_card_text.text_style.font_size = 12.0;
+            self.draw_card_text.color = vec4(0.6, 0.6, 0.6, 1.0);
+            self.draw_card_text.draw_walk(cx, Walk::fit(), Align::default(), artist_name);
+            self.draw_card_text.color = vec4(1.0, 1.0, 1.0, 1.0); // Reset color
+        }
+
+        cx.end_turtle();
+
+        // Audio bars visualization (placed right after title/artist)
+        let bars_walk = Walk {
+            width: Size::Fixed(50.0),
+            height: Size::Fixed(35.0),
+            margin: Margin { left: 16.0, ..Margin::default() },
+            ..Walk::default()
+        };
+        self.draw_audio_bars.is_playing = if is_playing { 1.0 } else { 0.0 };
+        self.draw_audio_bars.draw_walk(cx, bars_walk);
+
+        // Request next frame for continuous animation when playing
+        if is_playing {
+            cx.new_next_frame();
+        }
+
+        cx.end_turtle();
+
+        // Play button
+        let button_walk = Walk::fit();
+        let button_layout = Layout {
+            padding: Padding {
+                left: 20.0,
+                right: 20.0,
+                top: 10.0,
+                bottom: 10.0,
+            },
+            align: Align { x: 0.5, y: 0.5 },
+            ..Layout::default()
+        };
+
+        // Button colors - different for play vs stop
+        let (base_color, hover_color, button_text) = if is_playing {
+            (
+                vec4(0.9, 0.3, 0.3, 1.0),    // Red for stop
+                vec4(0.8, 0.2, 0.2, 1.0),    // Darker red
+                "⏹ Stop"
+            )
+        } else {
+            (
+                vec4(0.231, 0.51, 0.965, 1.0),   // Blue for play
+                vec4(0.145, 0.388, 0.922, 1.0), // Darker blue
+                "▶ Play"
+            )
+        };
+        let color = if is_hovered { hover_color } else { base_color };
+
+        self.draw_button.color = color;
+        self.draw_button.begin(cx, button_walk, button_layout);
+
+        // Play/Stop button text
+        self.draw_button_text.text_style.font_size = 14.0;
+        self.draw_button_text.draw_walk(cx, Walk::fit(), Align::default(), button_text);
+
+        self.draw_button.end(cx);
+
+        // Use draw_button's area directly for hit testing
+        let button_area = self.draw_button.area();
+
+        // Update or create Area for this audio player button
+        if audio_player_idx < self.audio_player_areas.len() {
+            self.audio_player_areas[audio_player_idx] = button_area;
+        } else {
+            self.audio_player_areas.push(button_area);
+        }
+
+        // Only end card if we started it
+        if !already_in_card {
+            self.inside_card = false;
+            self.draw_card.end(cx);
+        } else {
+            // End the container turtle we created
+            cx.end_turtle();
+        }
+
+        // Store metadata
+        self.audio_player_data.push((
+            component_id.to_string(),
+            url.clone(),
+            title.clone(),
+        ));
+
+        // Debug: check area rect
+        let rect = button_area.rect(cx);
+        log!("[render_audio_player] idx={}, id={}, rect=({:.0},{:.0} {:.0}x{:.0})",
+             audio_player_idx, component_id, rect.pos.x, rect.pos.y, rect.size.x, rect.size.y);
+    }
 }
 
 impl A2uiSurfaceRef {
@@ -2822,6 +3310,28 @@ impl A2uiSurfaceRef {
             }
         }
         None
+    }
+
+    /// Check if an audio play action was triggered
+    /// Returns (component_id, url, title) if PlayAudio was triggered
+    pub fn play_audio(&self, actions: &Actions) -> Option<(String, String, String)> {
+        if let Some(inner) = self.borrow() {
+            if let Some(action) = actions.find_widget_action(inner.widget_uid()) {
+                if let A2uiSurfaceAction::PlayAudio { component_id, url, title } =
+                    action.cast::<A2uiSurfaceAction>()
+                {
+                    return Some((component_id, url, title));
+                }
+            }
+        }
+        None
+    }
+
+    /// Set the currently playing audio component ID (for Play/Stop toggle display)
+    pub fn set_playing_component(&self, component_id: Option<String>) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_playing_component(component_id);
+        }
     }
 }
 

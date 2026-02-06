@@ -164,6 +164,8 @@ pub enum ComponentType {
 
     // Visualization components
     Chart(ChartComponent),
+    // Media components
+    AudioPlayer(AudioPlayerComponent),
 }
 
 /// Children reference - either explicit list or template-based
@@ -570,6 +572,27 @@ pub enum ChartType {
     Surface3d,
     Scatter3d,
     Line3d,
+// Media Components
+// ============================================================================
+
+/// Audio player component for playing audio URLs
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioPlayerComponent {
+    /// Audio URL (literal or path-bound)
+    pub url: StringValue,
+
+    /// Optional title for the audio
+    #[serde(default)]
+    pub title: Option<StringValue>,
+
+    /// Optional artist name
+    #[serde(default)]
+    pub artist: Option<StringValue>,
+
+    /// Whether to autoplay (default false)
+    #[serde(default)]
+    pub autoplay: Option<bool>,
 }
 
 // ============================================================================
@@ -881,5 +904,70 @@ mod tests {
 
         let messages = result.unwrap();
         assert_eq!(messages.len(), 3);
+    }
+
+    #[test]
+    fn test_parse_audio_player() {
+        // Test parsing AudioPlayer component
+        let json = r##"{"surfaceUpdate": {"surfaceId": "main", "components": [
+            {
+                "id": "player1",
+                "component": {
+                    "AudioPlayer": {
+                        "url": {"literalString": "https://example.com/song.mp3"},
+                        "title": {"literalString": "My Song"},
+                        "artist": {"literalString": "Artist Name"}
+                    }
+                }
+            }
+        ]}}"##;
+
+        let msg: A2uiMessage = serde_json::from_str(json).unwrap();
+        match msg {
+            A2uiMessage::SurfaceUpdate(su) => {
+                assert_eq!(su.components.len(), 1);
+                assert_eq!(su.components[0].id, "player1");
+                match &su.components[0].component {
+                    ComponentType::AudioPlayer(player) => {
+                        assert_eq!(player.url.as_literal(), Some("https://example.com/song.mp3"));
+                        assert_eq!(player.title.as_ref().and_then(|t| t.as_literal()), Some("My Song"));
+                        assert_eq!(player.artist.as_ref().and_then(|a| a.as_literal()), Some("Artist Name"));
+                    }
+                    _ => panic!("Expected AudioPlayer"),
+                }
+            }
+            _ => panic!("Expected SurfaceUpdate"),
+        }
+    }
+
+    #[test]
+    fn test_parse_audio_player_with_path() {
+        // Test parsing AudioPlayer with data binding
+        let json = r##"{"surfaceUpdate": {"surfaceId": "main", "components": [
+            {
+                "id": "player2",
+                "component": {
+                    "AudioPlayer": {
+                        "url": {"path": "/currentSong/audioUrl"},
+                        "title": {"path": "/currentSong/title"}
+                    }
+                }
+            }
+        ]}}"##;
+
+        let msg: A2uiMessage = serde_json::from_str(json).unwrap();
+        match msg {
+            A2uiMessage::SurfaceUpdate(su) => {
+                assert_eq!(su.components.len(), 1);
+                match &su.components[0].component {
+                    ComponentType::AudioPlayer(player) => {
+                        assert_eq!(player.url.as_path(), Some("/currentSong/audioUrl"));
+                        assert_eq!(player.title.as_ref().and_then(|t| t.as_path()), Some("/currentSong/title"));
+                    }
+                    _ => panic!("Expected AudioPlayer"),
+                }
+            }
+            _ => panic!("Expected SurfaceUpdate"),
+        }
     }
 }

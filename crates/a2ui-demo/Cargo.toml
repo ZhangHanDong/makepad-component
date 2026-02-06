@@ -43,9 +43,11 @@ tokio = { version = "1", features = ["full"], optional = true }
 hyper = { version = "1", features = ["full"], optional = true }
 hyper-util = { version = "0.1", features = ["tokio"], optional = true }
 http-body-util = { version = "0.1", optional = true }
-reqwest = { version = "0.11", features = ["json"], optional = true }
+reqwest = { version = "0.11", features = ["json", "stream"], optional = true }
+futures-util = { version = "0.3", optional = true }
 
 [features]
 default = []
 mock-server = ["tokio", "hyper", "hyper-util", "http-body-util"]
-kimi-bridge = ["tokio", "hyper", "hyper-util", "http-body-util", "reqwest"]
+kimi-bridge = ["tokio", "hyper", "hyper-util", "http-body-util", "reqwest", "futures-util"]
+mureka = ["kimi-bridge"]  # Mureka AI music generation (requires MUREKA_API_KEY)
