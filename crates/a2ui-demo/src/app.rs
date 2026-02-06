@@ -5,9 +5,103 @@
 //! - Streaming mode: Connect to A2A server for payment checkout UI
 
 use makepad_component::a2ui::*;
+use makepad_component::widgets::button::MpButtonAction;
 use makepad_widgets::*;
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
+
+// ============================================================================
+// Theme System
+// ============================================================================
+
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub enum Theme {
+    #[default]
+    DarkPurple,
+    Light,
+    Soft,
+}
+
+impl Theme {
+    fn from_index(index: usize) -> Self {
+        match index {
+            0 => Theme::DarkPurple,
+            1 => Theme::Light,
+            2 => Theme::Soft,
+            _ => Theme::DarkPurple,
+        }
+    }
+
+    fn to_index(self) -> usize {
+        match self {
+            Theme::DarkPurple => 0,
+            Theme::Light => 1,
+            Theme::Soft => 2,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Theme::DarkPurple => "Dark Purple",
+            Theme::Light => "Cloud White",
+            Theme::Soft => "Soft Gray",
+        }
+    }
+}
+
+struct ThemeColors {
+    bg_primary: Vec4,
+    bg_surface: Vec4,
+    text_primary: Vec4,
+    text_secondary: Vec4,
+    accent: Vec4,
+    accent_secondary: Vec4,
+    status_color: Vec4,
+}
+
+impl Theme {
+    fn colors(self) -> ThemeColors {
+        match self {
+            Theme::DarkPurple => ThemeColors {
+                bg_primary: vec4(0.102, 0.102, 0.180, 1.0),      // #1a1a2e
+                bg_surface: vec4(0.133, 0.133, 0.267, 1.0),      // #222244
+                text_primary: vec4(1.0, 1.0, 1.0, 1.0),          // #FFFFFF
+                text_secondary: vec4(0.533, 0.533, 0.533, 1.0),  // #888888
+                accent: vec4(0.0, 0.4, 0.8, 1.0),                // #0066CC
+                accent_secondary: vec4(0.0, 0.667, 0.4, 1.0),    // #00AA66
+                status_color: vec4(0.298, 0.686, 0.314, 1.0),    // #4CAF50
+            },
+            Theme::Light => ThemeColors {
+                bg_primary: vec4(0.961, 0.961, 0.969, 1.0),      // #f5f5f7 (iOS-like)
+                bg_surface: vec4(1.0, 1.0, 1.0, 1.0),            // #FFFFFF
+                text_primary: vec4(0.11, 0.11, 0.118, 1.0),      // #1c1c1e
+                text_secondary: vec4(0.557, 0.557, 0.576, 1.0),  // #8e8e93
+                accent: vec4(0.0, 0.478, 1.0, 1.0),              // #007AFF (iOS blue)
+                accent_secondary: vec4(0.204, 0.78, 0.349, 1.0), // #34C759 (iOS green)
+                status_color: vec4(0.204, 0.78, 0.349, 1.0),     // #34C759
+            },
+            Theme::Soft => ThemeColors {
+                // Soft Gray - mid-tone between dark and light
+                bg_primary: vec4(0.435, 0.455, 0.490, 1.0),      // #6f7479 (medium gray-blue)
+                bg_surface: vec4(0.533, 0.553, 0.588, 1.0),      // #888d96 (lighter gray)
+                text_primary: vec4(1.0, 1.0, 1.0, 1.0),          // #FFFFFF
+                text_secondary: vec4(0.85, 0.85, 0.88, 1.0),     // #d9d9e0 (light gray)
+                accent: vec4(0.0, 0.4, 0.8, 1.0),                // #0066CC (same blue as Dark Purple)
+                accent_secondary: vec4(0.0, 0.667, 0.4, 1.0),    // #00AA66 (same green as Dark Purple)
+                status_color: vec4(0.298, 0.686, 0.314, 1.0),    // #4CAF50 (same green)
+            },
+        }
+    }
+
+    /// Get A2UI surface theme colors for this theme
+    fn a2ui_colors(self) -> A2uiThemeColors {
+        match self {
+            Theme::DarkPurple => A2uiThemeColors::dark_purple(),
+            Theme::Light => A2uiThemeColors::light(),
+            Theme::Soft => A2uiThemeColors::soft(),
+        }
+    }
+}
 
 live_design! {
     use link::theme::*;
@@ -16,6 +110,8 @@ live_design! {
 
     use makepad_component::theme::colors::*;
     use makepad_component::a2ui::surface::*;
+    use makepad_component::widgets::dropdown::*;
+    use makepad_component::widgets::button::*;
 
     // Main Application
     App = {{App}} {
@@ -25,56 +121,84 @@ live_design! {
                 width: Fill
                 height: Fill
 
-                draw_bg: {
-                    fn pixel(self) -> vec4 {
-                        return #1a1a2e;
-                    }
-                }
-
                 body = <View> {
                     width: Fill
                     height: Fill
                     flow: Down
                     padding: 20.0
                     spacing: 16.0
+                    show_bg: true
+                    draw_bg: { color: #1a1a2e }
 
-                    // Title - changes based on mode
-                    title_label = <Label> {
-                        text: "A2UI Demo"
-                        draw_text: {
-                            text_style: <THEME_FONT_BOLD> { font_size: 24.0 }
-                            color: #FFFFFF
+                    // Header row: Title on left, Theme dropdown on right
+                    header_row = <View> {
+                        width: Fill
+                        height: Fit
+                        flow: Right
+                        align: { y: 0.5 }
+
+                        // Title and description column
+                        <View> {
+                            width: Fill
+                            height: Fit
+                            flow: Down
+                            spacing: 4.0
+
+                            // Title - changes based on mode
+                            title_label = <Label> {
+                                text: "A2UI Demo"
+                                draw_text: {
+                                    text_style: <THEME_FONT_BOLD> { font_size: 24.0 }
+                                    color: #FFFFFF
+                                }
+                            }
+
+                            // Description
+                            desc_label = <Label> {
+                                text: "Static: Product Catalog | Streaming: Payment Checkout"
+                                draw_text: {
+                                    text_style: <THEME_FONT_REGULAR> { font_size: 14.0 }
+                                    color: #888888
+                                }
+                            }
                         }
-                    }
 
-                    // Description
-                    desc_label = <Label> {
-                        text: "Static: Product Catalog | Streaming: Payment Checkout"
-                        draw_text: {
-                            text_style: <THEME_FONT_REGULAR> { font_size: 14.0 }
-                            color: #888888
+                        // Theme dropdown in top-right corner
+                        theme_dropdown = <MpDropdownSmall> {
+                            width: Fit
+                            height: Fit
+                            labels: ["Dark Purple", "Cloud White", "Soft Gray"]
+                            selected_item: 0
                         }
                     }
 
                     // Control buttons row
-                    <View> {
+                    controls_row = <View> {
                         width: Fill
                         height: Fit
                         flow: Right
                         spacing: 10.0
 
                         // Load static data button
-                        load_btn = <Button> {
+                        load_btn = <MpButton> {
                             text: "🛒 Product Catalog"
                             draw_text: { color: #FFFFFF }
-                            draw_bg: { color: #0066CC }
+                            draw_bg: {
+                                color: #0066CC
+                                color_hover: #0055AA
+                                color_pressed: #004488
+                            }
                         }
 
                         // Connect to server button
-                        connect_btn = <Button> {
+                        connect_btn = <MpButton> {
                             text: "🎨 Live Editor"
                             draw_text: { color: #FFFFFF }
-                            draw_bg: { color: #00AA66 }
+                            draw_bg: {
+                                color: #00AA66
+                                color_hover: #009955
+                                color_pressed: #008844
+                            }
                         }
 
                         // Server URL input
@@ -94,7 +218,7 @@ live_design! {
                     }
 
                     // A2UI Surface container with scroll
-                    <ScrollYView> {
+                    surface_container = <ScrollYView> {
                         width: Fill
                         height: Fill
                         show_bg: true
@@ -141,6 +265,9 @@ pub struct App {
 
     #[rust]
     last_content_hash: u64,
+
+    #[rust]
+    current_theme: Theme,
 }
 
 impl LiveRegister for App {
@@ -151,15 +278,158 @@ impl LiveRegister for App {
 }
 
 impl App {
-    fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
-        // Handle "Load Static Data" button click
-        if self.ui.button(ids!(load_btn)).clicked(&actions) {
-            self.load_a2ui_data(cx);
+    /// Apply the current theme colors to all UI elements
+    fn apply_theme(&mut self, cx: &mut Cx) {
+        let colors = self.current_theme.colors();
+
+        // Apply body background (main container)
+        self.ui.view(ids!(body)).apply_over(cx, live! {
+            draw_bg: { color: (colors.bg_primary) }
+        });
+
+        // Apply header row background (in case it needs distinction)
+        self.ui.view(ids!(header_row)).apply_over(cx, live! {
+            draw_bg: { color: (colors.bg_primary) }
+        });
+
+        // Apply controls row background
+        self.ui.view(ids!(controls_row)).apply_over(cx, live! {
+            draw_bg: { color: (colors.bg_primary) }
+        });
+
+        // Apply title color
+        self.ui.label(ids!(title_label)).apply_over(cx, live! {
+            draw_text: { color: (colors.text_primary) }
+        });
+
+        // Apply description color
+        self.ui.label(ids!(desc_label)).apply_over(cx, live! {
+            draw_text: { color: (colors.text_secondary) }
+        });
+
+        // Apply button colors - keep text white for contrast
+        let white = vec4(1.0, 1.0, 1.0, 1.0);
+
+        // Calculate hover/pressed colors (slightly darker versions)
+        let accent_hover = vec4(
+            colors.accent.x * 0.85,
+            colors.accent.y * 0.85,
+            colors.accent.z * 0.85,
+            1.0
+        );
+        let accent_pressed = vec4(
+            colors.accent.x * 0.7,
+            colors.accent.y * 0.7,
+            colors.accent.z * 0.7,
+            1.0
+        );
+        let secondary_hover = vec4(
+            colors.accent_secondary.x * 0.85,
+            colors.accent_secondary.y * 0.85,
+            colors.accent_secondary.z * 0.85,
+            1.0
+        );
+        let secondary_pressed = vec4(
+            colors.accent_secondary.x * 0.7,
+            colors.accent_secondary.y * 0.7,
+            colors.accent_secondary.z * 0.7,
+            1.0
+        );
+
+        self.ui.button(ids!(load_btn)).apply_over(cx, live! {
+            draw_bg: {
+                color: (colors.accent)
+                color_hover: (accent_hover)
+                color_pressed: (accent_pressed)
+            }
+            draw_text: { color: (white) }
+        });
+
+        self.ui.button(ids!(connect_btn)).apply_over(cx, live! {
+            draw_bg: {
+                color: (colors.accent_secondary)
+                color_hover: (secondary_hover)
+                color_pressed: (secondary_pressed)
+            }
+            draw_text: { color: (white) }
+        });
+
+        // Apply server URL label color
+        self.ui.label(ids!(server_url)).apply_over(cx, live! {
+            draw_text: { color: (colors.text_secondary) }
+        });
+
+        // Apply status label color
+        self.ui.label(ids!(status_label)).apply_over(cx, live! {
+            draw_text: { color: (colors.status_color) }
+        });
+
+        // Apply surface container background
+        self.ui.view(ids!(surface_container)).apply_over(cx, live! {
+            draw_bg: { color: (colors.bg_surface) }
+        });
+
+        // Apply theme-appropriate dropdown styling
+        let is_light = self.current_theme == Theme::Light;
+        let dropdown_text = if is_light {
+            vec4(0.04, 0.04, 0.04, 1.0)  // dark text
+        } else {
+            vec4(1.0, 1.0, 1.0, 1.0)     // white text
+        };
+        let dropdown_bg = if is_light {
+            vec4(1.0, 1.0, 1.0, 1.0)     // white bg
+        } else {
+            vec4(0.2, 0.2, 0.33, 1.0)    // dark purple bg
+        };
+        let dropdown_border = if is_light {
+            vec4(0.83, 0.83, 0.83, 1.0)  // light border
+        } else {
+            vec4(0.33, 0.33, 0.47, 1.0)  // dark border
+        };
+
+        self.ui.drop_down(ids!(theme_dropdown)).apply_over(cx, live! {
+            draw_text: { color: (dropdown_text) }
+            draw_bg: {
+                color: (dropdown_bg)
+                border_color: (dropdown_border)
+            }
+        });
+
+        // Apply theme to A2UI surface content
+        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
+            let a2ui_colors = self.current_theme.a2ui_colors();
+            surface.set_theme_colors(cx, &a2ui_colors);
         }
 
-        // Handle "Connect to Server" button click
-        if self.ui.button(ids!(connect_btn)).clicked(&actions) {
-            self.connect_to_server(cx);
+        self.ui.redraw(cx);
+    }
+
+    fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
+        // Handle theme dropdown selection
+        if let Some(index) = self.ui.drop_down(ids!(theme_dropdown)).selected(&actions) {
+            let new_theme = Theme::from_index(index);
+            if new_theme != self.current_theme {
+                self.current_theme = new_theme;
+                self.apply_theme(cx);
+                log!("Theme changed to: {:?}", self.current_theme);
+            }
+        }
+
+        // Handle "Load Static Data" button click (MpButton)
+        let load_btn_ref = self.ui.widget(ids!(load_btn));
+        if let Some(item) = actions.find_widget_action(load_btn_ref.widget_uid()) {
+            if matches!(item.cast::<MpButtonAction>(), MpButtonAction::Clicked) {
+                self.load_a2ui_data(cx);
+            }
+        }
+
+        // Handle "Connect to Server" button click (MpButton)
+        let connect_btn_ref = self.ui.widget(ids!(connect_btn));
+        if let Some(item) = actions.find_widget_action(connect_btn_ref.widget_uid()) {
+            if matches!(item.cast::<MpButtonAction>(), MpButtonAction::Clicked) {
+                self.connect_to_server(cx);
+            }
         }
 
         // Handle A2UI surface actions
@@ -471,8 +741,9 @@ impl App {
 
 impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
-        // Auto-connect to live server on startup
+        // Apply theme and auto-connect to live server on startup
         if let Event::Startup = event {
+            self.apply_theme(cx);
             self.connect_to_server(cx);
         }
 

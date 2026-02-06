@@ -15,6 +15,97 @@ use super::{
 };
 
 // ============================================================================
+// A2UI Theme Colors
+// ============================================================================
+
+/// Theme colors for A2UI surface and its components
+#[derive(Clone, Copy, Debug)]
+pub struct A2uiThemeColors {
+    /// Background color for the surface
+    pub bg_surface: Vec4,
+    /// Background color for cards
+    pub bg_card: Vec4,
+    /// Border color for cards, inputs, etc.
+    pub border_color: Vec4,
+    /// Primary text color
+    pub text_primary: Vec4,
+    /// Secondary/muted text color
+    pub text_secondary: Vec4,
+    /// Accent/primary button color
+    pub accent: Vec4,
+    /// Accent hover color
+    pub accent_hover: Vec4,
+    /// Accent pressed color
+    pub accent_pressed: Vec4,
+    /// Input field background color
+    pub input_bg: Vec4,
+    /// Slider track color
+    pub slider_track: Vec4,
+    /// Checkbox/slider fill color
+    pub control_fill: Vec4,
+}
+
+impl Default for A2uiThemeColors {
+    fn default() -> Self {
+        // Default dark purple theme
+        Self {
+            bg_surface: vec4(0.102, 0.102, 0.180, 1.0),      // #1a1a2e
+            bg_card: vec4(0.165, 0.227, 0.353, 1.0),         // #2a3a5a
+            border_color: vec4(0.333, 0.533, 0.733, 1.0),    // #5588bb
+            text_primary: vec4(1.0, 1.0, 1.0, 1.0),          // #FFFFFF
+            text_secondary: vec4(0.533, 0.533, 0.533, 1.0),  // #888888
+            accent: vec4(0.231, 0.51, 0.965, 1.0),           // #3B82F6
+            accent_hover: vec4(0.145, 0.388, 0.922, 1.0),    // slightly darker
+            accent_pressed: vec4(0.114, 0.306, 0.847, 1.0),  // even darker
+            input_bg: vec4(0.165, 0.227, 0.353, 1.0),        // #2a3a5a
+            slider_track: vec4(0.227, 0.290, 0.416, 1.0),    // #3a4a6a
+            control_fill: vec4(0.231, 0.51, 0.965, 1.0),     // #3B82F6
+        }
+    }
+}
+
+impl A2uiThemeColors {
+    /// Create dark purple theme colors (default)
+    pub fn dark_purple() -> Self {
+        Self::default()
+    }
+
+    /// Create light iOS-like theme colors
+    pub fn light() -> Self {
+        Self {
+            bg_surface: vec4(1.0, 1.0, 1.0, 1.0),            // #FFFFFF
+            bg_card: vec4(0.96, 0.96, 0.97, 1.0),            // #f5f5f8
+            border_color: vec4(0.85, 0.85, 0.87, 1.0),       // #d9d9de
+            text_primary: vec4(0.11, 0.11, 0.118, 1.0),      // #1c1c1e
+            text_secondary: vec4(0.557, 0.557, 0.576, 1.0),  // #8e8e93
+            accent: vec4(0.0, 0.478, 1.0, 1.0),              // #007AFF
+            accent_hover: vec4(0.0, 0.4, 0.85, 1.0),         // slightly darker
+            accent_pressed: vec4(0.0, 0.35, 0.75, 1.0),      // even darker
+            input_bg: vec4(0.95, 0.95, 0.97, 1.0),           // light gray
+            slider_track: vec4(0.9, 0.9, 0.92, 1.0),         // light gray
+            control_fill: vec4(0.0, 0.478, 1.0, 1.0),        // #007AFF
+        }
+    }
+
+    /// Create soft gray mid-tone theme colors
+    pub fn soft() -> Self {
+        Self {
+            bg_surface: vec4(0.533, 0.553, 0.588, 1.0),      // #888d96
+            bg_card: vec4(0.6, 0.62, 0.66, 1.0),             // slightly lighter
+            border_color: vec4(0.7, 0.72, 0.76, 1.0),        // light border
+            text_primary: vec4(1.0, 1.0, 1.0, 1.0),          // #FFFFFF
+            text_secondary: vec4(0.2, 0.2, 0.25, 1.0),       // dark gray for contrast
+            accent: vec4(0.231, 0.51, 0.965, 1.0),           // #3B82F6 (vibrant blue)
+            accent_hover: vec4(0.145, 0.388, 0.922, 1.0),    // slightly darker
+            accent_pressed: vec4(0.114, 0.306, 0.847, 1.0),  // even darker
+            input_bg: vec4(0.5, 0.52, 0.56, 1.0),            // medium gray
+            slider_track: vec4(0.45, 0.47, 0.51, 1.0),       // darker gray
+            control_fill: vec4(0.231, 0.51, 0.965, 1.0),     // #3B82F6 (vibrant blue)
+        }
+    }
+}
+
+// ============================================================================
 // A2UI Surface Actions
 // ============================================================================
 
@@ -756,6 +847,74 @@ impl A2uiSurface {
     pub fn clear(&mut self) {
         // Reset the processor to clear all surfaces and components
         self.processor = Some(A2uiMessageProcessor::with_standard_catalog());
+    }
+
+    /// Apply theme colors to all A2UI components
+    pub fn set_theme_colors(&mut self, cx: &mut Cx, colors: &A2uiThemeColors) {
+        // Apply surface background
+        self.draw_bg.apply_over(cx, live! {
+            bg_color: (colors.bg_surface)
+        });
+
+        // Apply text colors
+        self.draw_text.apply_over(cx, live! {
+            color: (colors.text_primary)
+        });
+
+        self.draw_card_text.apply_over(cx, live! {
+            color: (colors.text_primary)
+        });
+
+        // Apply card colors
+        self.draw_card.apply_over(cx, live! {
+            color: (colors.bg_card)
+            border_color: (colors.border_color)
+        });
+
+        // Apply button colors - the shader uses hardcoded colors, so we update via instance
+        self.draw_button.apply_over(cx, live! {
+            color: (colors.accent)
+        });
+
+        self.draw_button_text.apply_over(cx, live! {
+            color: (vec4(1.0, 1.0, 1.0, 1.0))
+        });
+
+        // Apply text field colors
+        self.draw_text_field.apply_over(cx, live! {
+            bg_color: (colors.input_bg)
+            border_color: (colors.border_color)
+        });
+
+        self.draw_text_field_text.apply_over(cx, live! {
+            color: (colors.text_primary)
+        });
+
+        self.draw_text_field_placeholder.apply_over(cx, live! {
+            color: (colors.text_secondary)
+        });
+
+        // Apply checkbox colors
+        self.draw_checkbox.apply_over(cx, live! {
+            bg_color: (colors.input_bg)
+            border_color: (colors.border_color)
+            check_color: (colors.control_fill)
+        });
+
+        self.draw_checkbox_label.apply_over(cx, live! {
+            color: (colors.text_primary)
+        });
+
+        // Apply slider colors
+        self.draw_slider_track.apply_over(cx, live! {
+            track_color: (colors.slider_track)
+            fill_color: (colors.control_fill)
+        });
+
+        // Apply image placeholder text
+        self.draw_image_text.apply_over(cx, live! {
+            color: (colors.text_secondary)
+        });
     }
 
     /// Load image textures from LiveDependency resources
