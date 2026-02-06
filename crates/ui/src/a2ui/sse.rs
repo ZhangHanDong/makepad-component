@@ -199,7 +199,6 @@ impl SseClient {
             .build();
 
         let mut request = agent.post(url)
-        let mut request = ureq::post(url)
             .set("Content-Type", "application/json")
             .set("Accept", "text/event-stream");
 

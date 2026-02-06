@@ -279,6 +279,7 @@ pub struct App {
 
     #[rust]
     poll_timer: Timer,
+    #[rust]
     current_theme: Theme,
 
     /// Currently playing audio URL (None = not playing)
@@ -437,9 +438,6 @@ impl App {
             self.load_math_charts(cx);
         }
 
-        // Handle "Connect to Server" button click
-        if self.ui.button(ids!(connect_btn)).clicked(&actions) {
-            self.connect_to_server(cx);
         // Handle "Load Static Data" button click (MpButton)
         let load_btn_ref = self.ui.widget(ids!(load_btn));
         if let Some(item) = actions.find_widget_action(load_btn_ref.widget_uid()) {
@@ -1011,6 +1009,7 @@ impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
         // Auto-load math charts on startup if math_test.json exists
         if let Event::Startup = event {
+            self.apply_theme(cx);
             if std::path::Path::new("math_test.json").exists() {
                 self.load_math_charts(cx);
             } else {
@@ -1028,41 +1027,21 @@ impl AppMain for App {
                 // Keep reconnecting to poll for new content
                 self.reconnect_live(cx);
             }
-        // Apply theme and auto-connect to live server on startup
-        if let Event::Startup = event {
-            self.apply_theme(cx);
-            self.connect_to_server(cx);
-        }
 
-        // Poll for streaming messages when connected
-        if self.host.is_some() {
-            self.poll_host(cx);
-        }
+            // Poll for real-time streaming updates from /live
+            if self.live_host.is_some() {
+                self.poll_live_host(cx);
+            }
 
-        // Poll for real-time streaming updates from /live
-        if self.live_host.is_some() {
-            self.poll_live_host(cx);
-        }
-
-        // Live mode: keep the event loop running for polling
-        if self.live_mode {
-            if self.host.is_none() {
-                // Reconnect periodically to get updates
-                let current_time = cx.seconds_since_app_start();
-                if current_time - self.last_poll_time > 0.2 {
-                    self.last_poll_time = current_time;
-                    self.reconnect_live(cx);
+            // Live mode: reconnect if disconnected
+            if self.live_mode {
+                if self.live_host.is_none() {
+                    self.connect_live_stream(cx);
                 }
             }
-            // Reconnect live stream if disconnected
-            if self.live_host.is_none() {
-                self.connect_live_stream(cx);
-            }
-            // Always request next frame to keep polling loop active
-            cx.new_next_frame();
         }
 
-        // Capture actions from UI event handling
+        // Capture actions from UI event handling (must run for ALL events)
         let actions = cx.capture_actions(|cx| {
             self.ui.handle_event(cx, event, &mut Scope::empty());
         });

@@ -439,6 +439,9 @@ live_design! {
 
             let alpha = aa * self.opacity;
             return vec4(self.color.rgb * self.color.a * alpha, self.color.a * alpha);
+        }
+    }
+
     // A2UI Audio Bars - Neon waveform visualization for audio player
     // ============================================================================
     DrawAudioBars = {{DrawAudioBars}} {
@@ -957,6 +960,10 @@ pub struct DrawA2uiQuad {
     pub p3x: f32,
     #[live(1.0)]
     pub p3y: f32,
+}
+
+#[derive(Live, LiveHook, LiveRegister)]
+#[repr(C)]
 pub struct DrawAudioBars {
     #[deref]
     draw_super: DrawQuad,

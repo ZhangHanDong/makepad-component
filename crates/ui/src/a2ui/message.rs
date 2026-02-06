@@ -572,6 +572,8 @@ pub enum ChartType {
     Surface3d,
     Scatter3d,
     Line3d,
+}
+
 // Media Components
 // ============================================================================
 

@@ -276,6 +276,9 @@ impl ComponentRegistry {
             a2ui_type: A2uiComponentType::Chart,
             makepad_widget: "A2uiChart",
             description: "Chart visualization (bar, line, pie)",
+            implemented: true,
+        });
+
         // Media components
         registry.register(ComponentMapping {
             a2ui_type: A2uiComponentType::AudioPlayer,
