@@ -1008,14 +1008,17 @@ pub fn render_surface3d(
     chart: &ChartComponent,
     data_model: &DataModel,
     current_scope: Option<&str>,
+    chart_id: &str,
 ) {
-    log!("[render_surface3d] Rendering 3D surface with {} series, size {}x{}",
-         chart.series.len(), chart.width, chart.height);
-    plot.clear();
+    log!("[render_surface3d] Rendering 3D surface '{}' with {} series, size {}x{}",
+         chart_id, chart.series.len(), chart.width, chart.height);
 
-    // Convert series to 2D grid: each series is a row of z-values
+    // Use per-chart instance state (preserves view angles/zoom across redraws)
+    let instance = plot.get_chart_mut(chart_id);
+
+    // Update data (but preserve interactive state like view3d, zoom)
     let z_data: Vec<Vec<f64>> = chart.series.iter().map(|s| s.values.clone()).collect();
-    plot.set_data(z_data);
+    instance.set_data(z_data);
 
     // Set ranges from labels if provided: [x_min, x_max, y_min, y_max]
     if chart.labels.len() >= 4 {
@@ -1025,25 +1028,25 @@ pub fn render_surface3d(
             chart.labels[2].parse::<f64>(),
             chart.labels[3].parse::<f64>(),
         ) {
-            plot.set_x_range(xmin, xmax);
-            plot.set_y_range(ymin, ymax);
+            instance.x_range = (xmin, xmax);
+            instance.y_range = (ymin, ymax);
         }
     }
 
     if let Some(ref cm) = chart.colormap {
-        plot.set_colormap(parse_colormap(cm));
+        instance.colormap = parse_colormap(cm);
     }
 
     // Show surface with wireframe overlay for nice look
-    plot.set_surface(true);
-    plot.set_wireframe(true);
+    instance.show_surface = true;
+    instance.show_wireframe = true;
 
     if let Some(title) = resolve_title(&chart.title, data_model, current_scope) {
-        plot.set_title(title);
+        instance.title = title;
     }
 
     let walk = Walk::new(Size::Fixed(chart.width), Size::Fixed(chart.height));
-    let _ = plot.draw_walk(cx, scope, walk);
+    let _ = plot.draw_chart_instance(cx, scope, walk, chart_id);
 }
 
 // ============================================================================

@@ -809,9 +809,9 @@ impl App {
                     }
                 }
                 if self.live_mode {
-                    self.ui.label(ids!(status_label)).set_text(cx, "🎨 UI Updated from ui_live.json");
+                    self.ui.label(ids!(status_label)).set_text(cx, "🎨 Live UI Updated");
                     self.loaded = true;
-                    self.poll_timer = Timer::default(); // Stop polling — no data, no refresh
+                    // Keep polling for new content updates
                 } else {
                     self.ui.label(ids!(status_label)).set_text(cx, "💳 Streaming payment UI...");
                 }
@@ -1024,8 +1024,8 @@ impl AppMain for App {
         if self.poll_timer.is_event(event).is_some() {
             if self.host.is_some() {
                 self.poll_host(cx);
-            } else if self.live_mode && !self.loaded {
-                // Only reconnect if we haven't loaded data yet
+            } else if self.live_mode {
+                // Keep reconnecting to poll for new content
                 self.reconnect_live(cx);
             }
         // Apply theme and auto-connect to live server on startup

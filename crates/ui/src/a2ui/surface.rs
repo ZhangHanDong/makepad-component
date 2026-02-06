@@ -1933,7 +1933,8 @@ impl A2uiSurface {
                 self.render_list(cx, scope, surface, data_model, list);
             }
             ComponentType::Chart(chart) => {
-                self.render_chart(cx, scope, chart, data_model);
+                self.render_chart(cx, scope, chart, data_model, component_id);
+            }
             ComponentType::AudioPlayer(audio_player) => {
                 self.render_audio_player(cx, audio_player, data_model, component_id);
             }
@@ -2790,6 +2791,7 @@ impl A2uiSurface {
         scope: &mut Scope,
         chart: &ChartComponent,
         data_model: &DataModel,
+        component_id: &str,
     ) {
         let current_scope = self.current_scope.clone();
         let cs = current_scope.as_deref();
@@ -2821,8 +2823,8 @@ impl A2uiSurface {
             ChartType::Stackplot => chart_bridge::render_stackplot(&mut self.plot_stackplot, cx, scope, chart, data_model, cs),
             ChartType::Hexbin => chart_bridge::render_hexbin(&mut self.plot_hexbin, cx, scope, chart, data_model, cs),
             ChartType::Streamgraph => chart_bridge::render_streamgraph(&mut self.plot_streamgraph, cx, scope, chart, data_model, cs),
-            // 3D chart types
-            ChartType::Surface3d => chart_bridge::render_surface3d(&mut self.plot_surface3d, cx, scope, chart, data_model, cs),
+            // 3D chart types - pass component_id for per-chart state tracking
+            ChartType::Surface3d => chart_bridge::render_surface3d(&mut self.plot_surface3d, cx, scope, chart, data_model, cs, component_id),
             ChartType::Scatter3d => chart_bridge::render_scatter3d(&mut self.plot_scatter3d, cx, scope, chart, data_model, cs),
             ChartType::Line3d => chart_bridge::render_line3d(&mut self.plot_line3d, cx, scope, chart, data_model, cs),
         }
