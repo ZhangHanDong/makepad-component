@@ -19,6 +19,7 @@ node_modules/
 .codexdebug/
 debug/
 .cowork/
+*.log
 
 # Test files
 ui_live.json

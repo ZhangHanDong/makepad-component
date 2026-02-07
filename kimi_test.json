@@ -1,0 +1,78 @@
+{
+  "model": "kimi-k2.5",
+  "messages": [
+    {"role": "system", "content": "You are an A2UI generator. Use the provided tools to build UI components."},
+    {"role": "user", "content": "Create a volume slider with a label and value display"}
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "create_slider",
+        "description": "Create a slider input component",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string", "description": "Unique component ID"},
+            "label": {"type": "string", "description": "Label text"},
+            "dataPath": {"type": "string", "description": "JSON pointer path e.g. /volume"},
+            "min": {"type": "number"},
+            "max": {"type": "number"},
+            "step": {"type": "number"}
+          },
+          "required": ["id", "dataPath", "min", "max"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "create_text",
+        "description": "Create text/label component",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string"},
+            "text": {"type": "string", "description": "Static text"},
+            "dataPath": {"type": "string", "description": "Dynamic text binding path"},
+            "style": {"type": "string", "enum": ["h1", "h3", "caption", "body"]}
+          },
+          "required": ["id"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "create_row",
+        "description": "Create horizontal layout container",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string"},
+            "children": {"type": "array", "items": {"type": "string"}, "description": "Child component IDs"}
+          },
+          "required": ["id", "children"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "set_data",
+        "description": "Set initial data value",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {"type": "string", "description": "JSON pointer path"},
+            "value": {"type": "number", "description": "Initial value"}
+          },
+          "required": ["path", "value"]
+        }
+      }
+    }
+  ],
+  "temperature": 1,
+  "max_tokens": 4096,
+  "stream": false
+}

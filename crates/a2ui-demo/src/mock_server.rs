@@ -9,6 +9,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
+use log::{info, error};
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
@@ -642,7 +643,7 @@ async fn handle_request(req: Request<Incoming>) -> Result<Response<Full<Bytes>>,
             // Read request body
             let body_bytes = req.collect().await.unwrap().to_bytes();
             let body_str = String::from_utf8_lossy(&body_bytes);
-            println!("[Mock Server] Received request: {}...", &body_str[..body_str.len().min(100)]);
+            info!("Received request: {}...", &body_str[..body_str.len().min(100)]);
 
             // Build SSE response body
             let messages = sample_messages();
@@ -651,10 +652,10 @@ async fn handle_request(req: Request<Incoming>) -> Result<Response<Full<Bytes>>,
             for (i, msg) in messages.iter().enumerate() {
                 let data = serde_json::to_string(msg).unwrap();
                 sse_body.push_str(&format!("data: {}\n\n", data));
-                println!("[Mock Server] Queued message {}/{}", i + 1, messages.len());
+                info!("Queued message {}/{}", i + 1, messages.len());
             }
 
-            println!("[Mock Server] Stream complete - {} messages sent", messages.len());
+            info!("Stream complete - {} messages sent", messages.len());
 
             let response = Response::builder()
                 .status(StatusCode::OK)
@@ -681,6 +682,8 @@ async fn handle_request(req: Request<Incoming>) -> Result<Response<Full<Bytes>>,
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    env_logger::init();
+
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     let listener = TcpListener::bind(addr).await?;
 
@@ -693,7 +696,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     loop {
         let (stream, remote_addr) = listener.accept().await?;
-        println!("[Mock Server] Connection from {}", remote_addr);
+        info!("Connection from {}", remote_addr);
 
         let io = TokioIo::new(stream);
 
@@ -702,7 +705,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 .serve_connection(io, service_fn(handle_request))
                 .await
             {
-                eprintln!("[Mock Server] Connection error: {:?}", err);
+                error!("Connection error: {:?}", err);
             }
         });
     }

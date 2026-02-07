@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 use std::sync::mpsc::Receiver;
 
+use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -101,6 +102,7 @@ impl A2aClient {
             receiver: rx,
             client_task_id: self.task_id.clone(),
             client_context_id: self.context_id.clone(),
+            pending_messages: Vec::new(),
         })
     }
 
@@ -180,12 +182,19 @@ pub struct A2aEventStream {
     receiver: Receiver<SseEvent>,
     client_task_id: Option<String>,
     client_context_id: Option<String>,
+    /// Queue of pending messages (for when we receive an array)
+    pending_messages: Vec<A2uiMessage>,
 }
 
 impl A2aEventStream {
     /// Receive next A2UI message from stream
     /// Returns None when stream ends
     pub fn next(&mut self) -> Option<A2aStreamEvent> {
+        // First check if we have pending messages from a previous array
+        if let Some(msg) = self.pending_messages.pop() {
+            return Some(A2aStreamEvent::A2uiMessage(msg));
+        }
+
         loop {
             match self.receiver.recv() {
                 Ok(SseEvent::Data(data)) => {
@@ -203,15 +212,25 @@ impl A2aEventStream {
                                 return self.process_result(result);
                             }
                         }
-                        Err(e) => {
-                            // Try parsing as direct A2UI message
-                            match serde_json::from_str::<A2uiMessage>(&data) {
-                                Ok(msg) => return Some(A2aStreamEvent::A2uiMessage(msg)),
-                                Err(_) => {
-                                    // Log parse error but continue
-                                    continue;
+                        Err(_) => {
+                            // Try parsing as array of A2UI messages first (A2UI bridge format)
+                            if let Ok(msgs) = serde_json::from_str::<Vec<A2uiMessage>>(&data) {
+                                if !msgs.is_empty() {
+                                    // Store all but the first in pending queue (reversed for pop order)
+                                    let mut msgs = msgs;
+                                    let first = msgs.remove(0);
+                                    msgs.reverse();
+                                    self.pending_messages = msgs;
+                                    return Some(A2aStreamEvent::A2uiMessage(first));
                                 }
                             }
+                            // Try parsing as single A2UI message
+                            if let Ok(msg) = serde_json::from_str::<A2uiMessage>(&data) {
+                                return Some(A2aStreamEvent::A2uiMessage(msg));
+                            }
+                            // Log parse error but continue
+                            warn!("Failed to parse SSE data as A2UI message: {}", &data[..data.len().min(200)]);
+                            continue;
                         }
                     }
                 }
@@ -223,10 +242,17 @@ impl A2aEventStream {
                     return Some(A2aStreamEvent::Error(e));
                 }
                 Ok(SseEvent::Done) => {
+                    // Check for remaining pending messages before returning None
+                    if let Some(msg) = self.pending_messages.pop() {
+                        return Some(A2aStreamEvent::A2uiMessage(msg));
+                    }
                     return None;
                 }
                 Err(_) => {
-                    // Channel closed
+                    // Channel closed - check pending messages first
+                    if let Some(msg) = self.pending_messages.pop() {
+                        return Some(A2aStreamEvent::A2uiMessage(msg));
+                    }
                     return None;
                 }
             }
@@ -246,16 +272,28 @@ impl A2aEventStream {
             ResultValue::Event(event) => {
                 // Check for A2UI messages in data
                 if let Some(data) = event.data {
-                    eprintln!("[A2A] Event data: {}", serde_json::to_string_pretty(&data).unwrap_or_default());
+                    debug!("Event data: {}", serde_json::to_string_pretty(&data).unwrap_or_default());
 
-                    // Try to parse as A2UI message
+                    // Try to parse as array of A2UI messages first (A2UI bridge format)
+                    if let Ok(msgs) = serde_json::from_value::<Vec<A2uiMessage>>(data.clone()) {
+                        if !msgs.is_empty() {
+                            let mut msgs = msgs;
+                            let first = msgs.remove(0);
+                            msgs.reverse();
+                            self.pending_messages = msgs;
+                            debug!("Parsed {} A2uiMessages from array", self.pending_messages.len() + 1);
+                            return Some(A2aStreamEvent::A2uiMessage(first));
+                        }
+                    }
+
+                    // Try to parse as single A2UI message
                     match serde_json::from_value::<A2uiMessage>(data.clone()) {
                         Ok(msg) => {
-                            eprintln!("[A2A] Parsed A2uiMessage directly: {:?}", msg);
+                            debug!("Parsed A2uiMessage directly: {:?}", msg);
                             return Some(A2aStreamEvent::A2uiMessage(msg));
                         }
                         Err(e) => {
-                            eprintln!("[A2A] Direct A2uiMessage parse failed: {}", e);
+                            debug!("Direct A2uiMessage parse failed: {}", e);
                         }
                     }
 

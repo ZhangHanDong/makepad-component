@@ -1,18 +1,18 @@
-# Kimi A2UI Bridge: LLM-Powered UI Generation
+# A2UI Bridge: LLM-Powered UI Generation
 
 ## Overview
 
-The Kimi A2UI Bridge enables natural language UI generation by leveraging Kimi K2.5's tool use (function calling) capabilities to produce declarative A2UI JSON that renders in real-time on Makepad.
+The A2UI Bridge enables natural language UI generation by leveraging any OpenAI-compatible LLM's tool use (function calling) capabilities to produce declarative A2UI JSON that renders in real-time on Makepad.
 
 ```
 ┌─────────────┐     ┌──────────────────┐     ┌─────────────┐     ┌─────────────┐
-│   User      │────▶│  Kimi Bridge     │────▶│ Watch       │────▶│  Makepad    │
+│   User      │────▶│  A2UI Bridge     │────▶│ Watch       │────▶│  Makepad    │
 │   Prompt    │     │  Server          │     │ Server      │     │  App        │
 └─────────────┘     └──────────────────┘     └─────────────┘     └─────────────┘
                            │                        │
                            ▼                        │
                     ┌──────────────┐                │
-                    │  Kimi K2.5   │                │
+                    │  LLM         │                │
                     │  (Tool Use)  │                │
                     └──────────────┘                │
                            │                        │
@@ -97,9 +97,9 @@ The bridge defines 10 tools that map directly to A2UI components:
 }
 ```
 
-### 3. Kimi Bridge Server
+### 3. A2UI Bridge Server
 
-The bridge server (`kimi_bridge.rs`) handles:
+The bridge server (`a2ui_bridge.rs`) handles:
 
 #### HTTP Endpoints
 
@@ -115,13 +115,13 @@ The bridge server (`kimi_bridge.rs`) handles:
 
 1. **User sends message** → POST /chat with `{"message": "Create a login form"}`
 
-2. **Bridge calls Kimi API** with:
+2. **Bridge calls LLM API** with:
    - System prompt explaining UI generation
    - Tool definitions
    - User message
-   - `temperature: 1` (required for Kimi K2.5)
+   - `temperature: 1`
 
-3. **Kimi returns tool calls**:
+3. **LLM returns tool calls**:
 ```json
 {
   "choices": [{
@@ -258,9 +258,9 @@ Slider value automatically syncs with `/volume` data path.
 ### Starting the Servers
 
 ```bash
-# Terminal 1: Start the Kimi Bridge
-export MOONSHOT_API_KEY="your-api-key"
-cargo run --bin kimi-bridge --features kimi-bridge
+# Terminal 1: Start the A2UI Bridge
+export MOONSHOT_API_KEY="your-api-key"  # or LLM_API_KEY
+cargo run --bin a2ui-bridge --features a2ui-bridge
 
 # Terminal 2: Start the Watch Server
 cargo run --bin watch-server --features mock-server
@@ -290,13 +290,13 @@ curl -X POST http://127.0.0.1:8081/reset
 
 1. Click "Live Editor" button to enter live mode
 2. App automatically polls for changes every second
-3. UI updates in real-time as Kimi generates new components
+3. UI updates in real-time as the LLM generates new components
 
 ## Example: Generated Music Player
 
 **User Prompt**: "Create a music player with play/pause buttons, volume slider, and track info"
 
-**Kimi Tool Calls**:
+**LLM Tool Calls**:
 ```
 1. create_text(id="track-title", text="🎵 Currently Playing", style="h1")
 2. create_text(id="artist-name", text="Artist - Song Title", style="body")
@@ -355,7 +355,7 @@ curl -X POST http://127.0.0.1:8081/reset
 
 ## API Reference
 
-### Kimi API Configuration
+### LLM API Configuration
 
 ```json
 {
@@ -368,7 +368,7 @@ curl -X POST http://127.0.0.1:8081/reset
 }
 ```
 
-**Note**: Kimi K2.5 requires `temperature: 1` for tool use.
+**Note**: Some models (e.g., Kimi K2.5) require `temperature: 1` for tool use.
 
 ### System Prompt
 

@@ -1,0 +1,86 @@
+[
+  {
+    "beginRendering": {
+      "surfaceId": "main",
+      "root": "root-column"
+    }
+  },
+  {
+    "surfaceUpdate": {
+      "surfaceId": "main",
+      "components": [
+        {
+          "id": "root-column",
+          "component": {
+            "Column": {
+              "children": {"explicitList": ["title", "bar-chart", "line-chart", "pie-chart"]}
+            }
+          }
+        },
+        {
+          "id": "title",
+          "component": {
+            "Text": {
+              "text": {"literalString": "Sales Dashboard"},
+              "usageHint": "h1"
+            }
+          }
+        },
+        {
+          "id": "bar-chart",
+          "component": {
+            "Chart": {
+              "chartType": "bar",
+              "title": {"literalString": "Monthly Revenue"},
+              "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+              "series": [
+                {"name": "Revenue", "values": [12000, 19000, 15000, 22000, 18000, 25000]},
+                {"name": "Costs", "values": [8000, 12000, 9000, 14000, 11000, 15000]}
+              ],
+              "width": 500,
+              "height": 300
+            }
+          }
+        },
+        {
+          "id": "line-chart",
+          "component": {
+            "Chart": {
+              "chartType": "line",
+              "title": {"literalString": "User Growth"},
+              "labels": ["Q1", "Q2", "Q3", "Q4"],
+              "series": [
+                {"name": "Users", "values": [1200, 2400, 3800, 5200]},
+                {"name": "Active", "values": [800, 1800, 3200, 4600]}
+              ],
+              "width": 500,
+              "height": 280
+            }
+          }
+        },
+        {
+          "id": "pie-chart",
+          "component": {
+            "Chart": {
+              "chartType": "pie",
+              "title": {"literalString": "Revenue by Category"},
+              "labels": ["Electronics", "Clothing", "Food", "Services"],
+              "series": [
+                {"values": [45, 25, 15, 15]}
+              ],
+              "width": 500,
+              "height": 280
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "dataModelUpdate": {
+      "surfaceId": "main",
+      "path": "/",
+      "contents": []
+    }
+  }
+]

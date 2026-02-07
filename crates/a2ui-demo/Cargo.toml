@@ -23,15 +23,24 @@ path = "src/watch_server.rs"
 required-features = ["mock-server"]
 
 [[bin]]
-name = "kimi-bridge"
-path = "src/kimi_bridge.rs"
-required-features = ["kimi-bridge"]
+name = "a2ui-bridge"
+path = "src/a2ui_bridge.rs"
+
+[[bin]]
+name = "math-charts"
+path = "src/math_charts.rs"
+
+[[bin]]
+name = "fft-demo"
+path = "src/fft_demo.rs"
 
 [dependencies]
 makepad-component = { workspace = true }
 makepad-widgets = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+log = "0.4"
+env_logger = "0.11"
 
 # Mock server dependencies
 tokio = { version = "1", features = ["full"], optional = true }
@@ -44,5 +53,5 @@ futures-util = { version = "0.3", optional = true }
 [features]
 default = []
 mock-server = ["tokio", "hyper", "hyper-util", "http-body-util"]
-kimi-bridge = ["tokio", "hyper", "hyper-util", "http-body-util", "reqwest", "futures-util"]
-mureka = ["kimi-bridge"]  # Mureka AI music generation (requires MUREKA_API_KEY)
+a2ui-bridge = ["tokio", "hyper", "hyper-util", "http-body-util", "reqwest", "futures-util"]
+mureka = ["a2ui-bridge"]  # Mureka AI music generation (requires MUREKA_API_KEY)

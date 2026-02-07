@@ -162,6 +162,8 @@ pub enum ComponentType {
     Modal(ModalComponent),
     Tabs(TabsComponent),
 
+    // Visualization components
+    Chart(ChartComponent),
     // Media components
     AudioPlayer(AudioPlayerComponent),
 }
@@ -444,6 +446,134 @@ pub struct TabDefinition {
 }
 
 // ============================================================================
+// Visualization Components
+// ============================================================================
+
+/// Chart visualization component (bar, line, pie, etc.)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChartComponent {
+    /// Chart type
+    pub chart_type: ChartType,
+
+    /// Chart title (optional)
+    #[serde(default)]
+    pub title: Option<StringValue>,
+
+    /// Category labels (X-axis for bar/line, slice labels for pie)
+    #[serde(default)]
+    pub labels: Vec<String>,
+
+    /// Data series - each series has a name and values
+    pub series: Vec<ChartSeries>,
+
+    /// Chart width in logical pixels
+    #[serde(default = "default_chart_width")]
+    pub width: f64,
+
+    /// Chart height in logical pixels
+    #[serde(default = "default_chart_height")]
+    pub height: f64,
+
+    /// Color palette (hex strings, optional - defaults to built-in palette)
+    #[serde(default)]
+    pub colors: Vec<String>,
+
+    /// Whether to show legend
+    #[serde(default)]
+    pub show_legend: Option<bool>,
+
+    /// Max value (used by gauge chart as dial maximum, default 100)
+    #[serde(default)]
+    pub max_value: Option<f64>,
+
+    /// Whether the chart is interactive (pan/zoom)
+    #[serde(default)]
+    pub interactive: Option<bool>,
+
+    /// Colormap name (e.g., "viridis", "plasma", "inferno")
+    #[serde(default)]
+    pub colormap: Option<String>,
+
+    /// Whether to stack series data
+    #[serde(default)]
+    pub stacked: Option<bool>,
+
+    /// Whether bars/layout should be horizontal
+    #[serde(default)]
+    pub horizontal: Option<bool>,
+
+    /// X-axis label
+    #[serde(default)]
+    pub x_label: Option<String>,
+
+    /// Y-axis label
+    #[serde(default)]
+    pub y_label: Option<String>,
+}
+
+fn default_chart_width() -> f64 {
+    400.0
+}
+
+fn default_chart_height() -> f64 {
+    300.0
+}
+
+/// A data series for charts
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChartSeries {
+    /// Series name (for legend)
+    #[serde(default)]
+    pub name: Option<String>,
+
+    /// Data values (Y-axis or primary values)
+    pub values: Vec<f64>,
+
+    /// Explicit X-axis values (optional; defaults to 0, 1, 2, ... if absent)
+    #[serde(default)]
+    pub x_values: Option<Vec<f64>>,
+}
+
+/// Supported chart types
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ChartType {
+    // Original types
+    Bar,
+    Line,
+    Pie,
+    Area,
+    Scatter,
+    Radar,
+    Gauge,
+    Bubble,
+    Candlestick,
+    Heatmap,
+    Treemap,
+    Chord,
+    Sankey,
+    // New types from makepad-plot
+    Histogram,
+    BoxPlot,
+    Donut,
+    Stem,
+    Violin,
+    Polar,
+    Contour,
+    Waterfall,
+    Funnel,
+    Step,
+    Stackplot,
+    Hexbin,
+    Streamgraph,
+    // 3D types
+    Surface3d,
+    Scatter3d,
+    Line3d,
+}
+
 // Media Components
 // ============================================================================
 
