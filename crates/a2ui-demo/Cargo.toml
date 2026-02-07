@@ -15,14 +15,17 @@ path = "src/streaming_main.rs"
 [[bin]]
 name = "mock-a2a-server"
 path = "src/mock_server.rs"
+required-features = ["mock-server"]
 
 [[bin]]
 name = "watch-server"
 path = "src/watch_server.rs"
+required-features = ["mock-server"]
 
 [[bin]]
 name = "kimi-bridge"
 path = "src/kimi_bridge.rs"
+required-features = ["kimi-bridge"]
 
 [dependencies]
 makepad-component = { workspace = true }

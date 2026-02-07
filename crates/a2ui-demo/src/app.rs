@@ -938,20 +938,18 @@ impl AppMain for App {
 
         // Live mode: keep the event loop running for polling
         if self.live_mode {
-            if self.host.is_none() {
-                // Reconnect periodically to get updates
+            // Reconnect /live SSE stream if disconnected (with backoff)
+            if self.live_host.is_none() {
                 let current_time = cx.seconds_since_app_start();
-                if current_time - self.last_poll_time > 0.2 {
+                if current_time - self.last_poll_time > 3.0 {
                     self.last_poll_time = current_time;
-                    self.reconnect_live(cx);
+                    self.connect_live_stream(cx);
                 }
             }
-            // Reconnect live stream if disconnected
-            if self.live_host.is_none() {
-                self.connect_live_stream(cx);
+            // Keep polling loop active while we have active connections
+            if self.host.is_some() || self.live_host.is_some() {
+                cx.new_next_frame();
             }
-            // Always request next frame to keep polling loop active
-            cx.new_next_frame();
         }
 
         // Capture actions from UI event handling
