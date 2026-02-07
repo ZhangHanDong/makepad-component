@@ -11,6 +11,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
+use log::{info, error, warn};
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::path::Path;
@@ -27,7 +28,7 @@ async fn watch_file(tx: broadcast::Sender<String>) {
     let mut last_content = String::new();
     let mut last_modified = std::time::SystemTime::UNIX_EPOCH;
 
-    println!("[Watcher] Watching file: {}", JSON_FILE);
+    info!("Watching file: {}", JSON_FILE);
 
     loop {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -50,24 +51,24 @@ async fn watch_file(tx: broadcast::Sender<String>) {
             let content = match fs::read_to_string(path).await {
                 Ok(c) => c,
                 Err(e) => {
-                    eprintln!("[Watcher] Error reading file: {}", e);
+                    error!("Error reading file: {}", e);
                     continue;
                 }
             };
 
             // Only broadcast if content actually changed
             if content != last_content {
-                println!("[Watcher] File changed, broadcasting update...");
+                info!("File changed, broadcasting update...");
 
                 // Validate JSON
                 match serde_json::from_str::<serde_json::Value>(&content) {
                     Ok(_) => {
                         let _ = tx.send(content.clone());
                         last_content = content;
-                        println!("[Watcher] Update broadcast complete");
+                        info!("Update broadcast complete");
                     }
                     Err(e) => {
-                        eprintln!("[Watcher] Invalid JSON: {}", e);
+                        warn!("Invalid JSON: {}", e);
                     }
                 }
             }
@@ -106,7 +107,7 @@ fn json_to_sse(json_content: &str) -> String {
         });
         let data = serde_json::to_string(&wrapped).unwrap();
         sse_body.push_str(&format!("data: {}\n\n", data));
-        println!("[Server] Sending message {}", i + 1);
+        info!("Sending message {}", i + 1);
     }
 
     sse_body
@@ -132,7 +133,7 @@ async fn handle_request(
 
         // Main RPC endpoint - initial load + subscribe to changes
         (&Method::POST, "/rpc") => {
-            println!("[Server] Client connected, sending current UI...");
+            info!("Client connected, sending current UI...");
 
             // Read current file content
             let content = fs::read_to_string(JSON_FILE).await.unwrap_or_else(|_| {
@@ -170,7 +171,7 @@ async fn handle_request(
 
         // SSE endpoint for live updates (long-polling style)
         (&Method::GET, "/live") => {
-            println!("[Server] Live update client connected, waiting for changes...");
+            info!("Live update client connected, waiting for changes...");
 
             let mut rx = tx.subscribe();
 
@@ -180,7 +181,7 @@ async fn handle_request(
                 rx.recv()
             ).await {
                 Ok(Ok(content)) => {
-                    println!("[Server] Sending live update to client");
+                    info!("Sending live update to client");
                     json_to_sse(&content)
                 }
                 _ => {
@@ -232,6 +233,8 @@ async fn handle_request(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    env_logger::init();
+
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     let listener = TcpListener::bind(addr).await?;
 
@@ -262,7 +265,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     loop {
         let (stream, remote_addr) = listener.accept().await?;
-        println!("[Server] Connection from {}", remote_addr);
+        info!("Connection from {}", remote_addr);
 
         let io = TokioIo::new(stream);
         let tx = tx.clone();
@@ -277,7 +280,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 .serve_connection(io, service)
                 .await
             {
-                eprintln!("[Server] Connection error: {:?}", err);
+                error!("Connection error: {:?}", err);
             }
         });
     }

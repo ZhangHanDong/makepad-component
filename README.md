@@ -18,12 +18,10 @@ A modern UI component library for [Makepad](https://github.com/makepad/makepad),
 - [Running the Demos](#running-the-demos)
   - [Component Zoo](#component-zoo)
   - [A2UI Static Demo](#a2ui-static-demo)
-  - [Kimi Bridge (LLM-powered UI)](#kimi-bridge-llm-powered-ui)
+  - [A2UI Bridge (LLM-powered UI)](#a2ui-bridge-llm-powered-ui)
   - [Watch Server (Live File Editing)](#watch-server-live-file-editing)
   - [Math Charts Demo](#math-charts-demo)
 - [LLM Configuration](#llm-configuration)
-  - [Kimi Cloud (K2.5)](#kimi-cloud-k25)
-  - [Local Qwen3 (via Ollama/vLLM)](#local-qwen3-via-ollamavllm)
 - [A2UI App Types & Examples](#a2ui-app-types--examples)
 - [Architecture](#architecture)
 - [WebAssembly Build](#webassembly-build)
@@ -150,53 +148,79 @@ cargo run -p a2ui-demo
 # Click "Product Catalog"
 ```
 
-### Kimi Bridge (LLM-powered UI)
+### A2UI Bridge (LLM-powered UI)
 
-Generate native UIs from natural language using Kimi K2.5's tool-calling API.
+Generate native UIs from natural language using **any OpenAI-compatible LLM** with tool-calling support. No code changes needed — configure everything via environment variables.
 
-**Terminal 1: Start Kimi Bridge Server (port 8081)**
+#### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LLM_API_URL` | `https://api.moonshot.ai/v1/chat/completions` | Chat completions endpoint (full URL) |
+| `LLM_MODEL` | `kimi-k2.5` | Model name |
+| `LLM_API_KEY` | `not-needed` | API key (also reads `MOONSHOT_API_KEY`) |
+| `LLM_PORT` | `8081` | Bridge server port |
+
+#### Quick Start
+
+**Terminal 1: Start the A2UI Bridge**
 ```bash
-export MOONSHOT_API_KEY="sk-your-api-key"
-cargo run --bin kimi-bridge --features kimi-bridge
+# Build once
+cargo build --bin a2ui-bridge --features a2ui-bridge
+
+# Run with any LLM provider (examples below)
+LLM_API_URL="https://integrate.api.nvidia.com/v1/chat/completions" \
+LLM_MODEL="minimaxai/minimax-m2.1" \
+LLM_API_KEY="nvapi-your-key" \
+LLM_PORT=8082 \
+./target/debug/a2ui-bridge
 ```
 
 **Terminal 2: Start the Makepad App**
 ```bash
 cargo run -p a2ui-demo
-# Click "Live Editor"
+# Click "Live Editor" — connects to localhost:8082 by default
 ```
-
-> **Note:** The app connects to `localhost:8082` by default. To use kimi-bridge directly, change the URL in `crates/a2ui-demo/src/app.rs` (line ~295) from port `8082` to `8081`.
 
 **Terminal 3: Generate UIs via Chat**
 ```bash
 # Login form
-curl -X POST http://127.0.0.1:8081/chat \
+curl -X POST http://127.0.0.1:8082/chat \
   -H 'Content-Type: application/json' \
   -d '{"message": "Create a login form with username, password, and sign-in button"}'
 
 # Music player
-curl -X POST http://127.0.0.1:8081/chat \
+curl -X POST http://127.0.0.1:8082/chat \
   -d '{"message": "Create a music player with play/pause, next, prev buttons and volume slider"}'
 
-# Stock watchlist
-curl -X POST http://127.0.0.1:8081/chat \
-  -d '{"message": "Create a stock watchlist with AAPL, GOOGL, TSLA prices and buy/sell buttons"}'
-
 # Health tracker with charts
-curl -X POST http://127.0.0.1:8081/chat \
+curl -X POST http://127.0.0.1:8082/chat \
   -d '{"message": "Create a health dashboard with steps bar chart, heart rate line chart, and sleep pie chart"}'
+
+# Reset conversation
+curl -X POST http://127.0.0.1:8082/reset
 ```
 
-#### Kimi Bridge Endpoints
+#### Tested LLM Providers
+
+| Provider | LLM_API_URL | LLM_MODEL | Notes |
+|----------|-------------|-----------|-------|
+| **NVIDIA NIM** | `https://integrate.api.nvidia.com/v1/chat/completions` | `minimaxai/minimax-m2.1` | Best quality, free tier available |
+| **NVIDIA NIM** | `https://integrate.api.nvidia.com/v1/chat/completions` | `z-ai/glm4.7` | GLM 4.7 with reasoning |
+| **Moonshot** | `https://api.moonshot.ai/v1/chat/completions` | `kimi-k2.5` | Default, requires `MOONSHOT_API_KEY` |
+
+> **Tip:** The LLM must support **tool/function calling** for the bridge to work. Tested models: MiniMax M2.1, GLM 4.7, Kimi K2.5. Any OpenAI-compatible endpoint with tool calling works.
+
+#### Bridge Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/chat` | POST | Send natural language, receive A2UI JSON |
-| `/rpc` | POST | A2A protocol endpoint (returns latest UI as SSE) |
-| `/live` | GET | Live updates via SSE |
+| `/chat` | POST | Send natural language `{"message": "..."}`, receive A2UI JSON |
+| `/rpc` | POST | A2A protocol endpoint (returns latest UI as SSE stream) |
+| `/live` | GET | Live updates via SSE (real-time push) |
 | `/reset` | POST | Clear conversation history |
-| `/status` | GET | Server health check |
+| `/status` | GET | Server health check (shows configured LLM URL and model) |
+| `/inject` | POST | Inject raw A2UI JSON directly `{"a2ui": [...]}` |
 
 #### Available Tool Functions
 
@@ -275,60 +299,24 @@ Functions include Gaussian, Saddle, Mexican Hat, Damped Ripple, and more.
 
 ## LLM Configuration
 
-### Kimi Cloud (K2.5)
+The A2UI Bridge is fully configurable via environment variables — no code changes needed. See the [environment variables table](#environment-variables) above.
 
-The default configuration uses Kimi K2.5 via the Moonshot API:
-
+**Example: NVIDIA NIM (MiniMax M2.1)**
 ```bash
-# Get your API key from https://platform.moonshot.cn/
-export MOONSHOT_API_KEY="sk-your-api-key"
-
-cargo run --bin kimi-bridge --features kimi-bridge
+LLM_API_URL="https://integrate.api.nvidia.com/v1/chat/completions" \
+LLM_MODEL="minimaxai/minimax-m2.1" \
+LLM_API_KEY="nvapi-your-key" \
+LLM_PORT=8082 \
+./target/debug/a2ui-bridge
 ```
 
-The bridge calls `https://api.moonshot.ai/v1/chat/completions` with model `kimi-k2.5`.
-
-### Local Qwen3 (via Ollama/vLLM)
-
-To use a local model instead of Kimi Cloud, modify the API URL and model name in `crates/a2ui-demo/src/kimi_bridge.rs`:
-
-**Step 1: Start a local OpenAI-compatible server**
-
+**Example: Moonshot Kimi K2.5 (default)**
 ```bash
-# Option A: Ollama
-ollama pull qwen3:32b
-ollama serve  # Serves on http://localhost:11434
-
-# Option B: vLLM
-pip install vllm
-vllm serve Qwen/Qwen3-32B --port 8000
+LLM_API_KEY="sk-your-moonshot-key" \
+./target/debug/a2ui-bridge
 ```
 
-**Step 2: Update the bridge configuration**
-
-Edit `crates/a2ui-demo/src/kimi_bridge.rs`:
-
-```rust
-// Change from:
-const KIMI_API_URL: &str = "https://api.moonshot.ai/v1/chat/completions";
-
-// To (Ollama):
-const KIMI_API_URL: &str = "http://localhost:11434/v1/chat/completions";
-
-// Or (vLLM):
-const KIMI_API_URL: &str = "http://localhost:8000/v1/chat/completions";
-```
-
-Also update the model name in the request body (search for `"model": "kimi-k2.5"` and change to your model name, e.g., `"qwen3:32b"`).
-
-**Step 3: Run without the API key**
-
-```bash
-export MOONSHOT_API_KEY="not-needed"  # Still required as env var
-cargo run --bin kimi-bridge --features kimi-bridge
-```
-
-> **Tip:** The LLM must support **tool/function calling** for the bridge to work. Qwen3-32B+ and Llama 3.1-70B+ support this well.
+Any OpenAI-compatible chat completions endpoint with tool calling support will work.
 
 ---
 
@@ -452,7 +440,7 @@ Generates visualizations of:
 Combine multiple chart types for financial analysis:
 
 ```bash
-curl -X POST http://127.0.0.1:8081/chat \
+curl -X POST http://127.0.0.1:8082/chat \
   -d '{"message": "Create a stock dashboard with: candlestick chart for AAPL price history, pie chart for portfolio allocation, line chart for performance over time, and gauge for portfolio risk score"}'
 ```
 
@@ -490,24 +478,30 @@ makepad-component/
 ├── crates/
 │   ├── ui/                  # Core library: A2UI renderer + component widgets
 │   │   └── src/a2ui/
-│   │       ├── surface.rs   # A2uiSurface - renders component tree
+│   │       ├── surface/     # A2uiSurface - renders component tree
 │   │       ├── message.rs   # A2UI protocol types (serde JSON)
 │   │       ├── host.rs      # SSE client for A2A servers
 │   │       ├── processor.rs # Message → widget tree conversion
-│   │       └── chart_bridge.rs  # ChartComponent → makepad-plot bridge
+│   │       ├── chart_bridge/    # ChartComponent → makepad-plot bridge
+│   │       ├── a2a_client.rs    # A2A protocol client (JSON-RPC + SSE)
+│   │       └── sse.rs           # SSE streaming client
 │   ├── component-zoo/       # Widget showcase demo app
 │   ├── a2ui-demo/           # A2UI demo app + servers
 │   │   └── src/
-│   │       ├── main.rs          # Makepad GUI app
-│   │       ├── kimi_bridge.rs   # Kimi LLM → A2UI bridge (port 8081)
+│   │       ├── main.rs              # Makepad GUI app
+│   │       ├── a2ui_bridge.rs       # LLM → A2UI bridge server
+│   │       ├── a2ui_bridge_impl/    # Bridge implementation modules
+│   │       │   ├── server.rs        #   HTTP routing + LLM API client
+│   │       │   ├── builder.rs       #   Tool calls → A2UI JSON builder
+│   │       │   ├── tools.rs         #   Tool definitions for LLM
+│   │       │   ├── types.rs         #   LLM response types
+│   │       │   └── mureka.rs        #   Music generation (optional)
 │   │       ├── watch_server.rs  # File-watching SSE server (port 8080)
-│   │       ├── mock_server.rs   # Mock A2A server (port 8080)
-│   │       ├── math_charts.rs   # Math function chart generator
-│   │       └── fft_demo.rs      # FFT visualization
+│   │       └── math_charts.rs   # Math function chart generator
 │   └── makepad-plot/        # Chart/plot library (29 chart types + 3D)
 │       └── src/
 │           ├── lib.rs
-│           ├── plot.rs      # All chart widgets (LinePlot, BarPlot, Surface3D, etc.)
+│           ├── plot/        # Chart widgets (LinePlot, BarPlot, Surface3D, etc.)
 │           ├── elements.rs  # Drawing primitives
 │           └── text.rs      # Plot text rendering
 ├── ui_live.json             # Live-editable A2UI JSON
@@ -517,29 +511,90 @@ makepad-component/
 
 ### Server Ports
 
-| Server | Port | Feature Flag | Purpose |
-|--------|------|-------------|---------|
-| Kimi Bridge | 8081 | `kimi-bridge` | LLM chat → A2UI JSON |
+| Server | Default Port | Feature Flag | Purpose |
+|--------|-------------|-------------|---------|
+| A2UI Bridge | 8082 (`LLM_PORT`) | `a2ui-bridge` | LLM chat → A2UI JSON |
 | Watch Server | 8080 | `mock-server` | File watcher → SSE stream |
 | Mock A2A Server | 8080 | `mock-server` | Static A2A responses |
+
+> The Makepad app connects to `localhost:8082` by default. Set `LLM_PORT=8082` when starting the bridge to match.
+
+### End-to-End Flow
+
+```
+┌──────────────────┐                    ┌───────────────────────────┐
+│  Natural Language │   curl /chat      │  LLM with Tool Calling    │
+│                  │ ─────────────────→ │                           │
+│  "Create a       │                    │  MiniMax M2.1 (NVIDIA NIM) │
+│   banking app"   │                    │    — or —                 │
+│                  │                    │  GLM 4.7 (NVIDIA NIM)     │
+└──────────────────┘                    │    — or —                 │
+                                        │  Any OpenAI-compatible    │
+                                        └─────────┬─────────────────┘
+                                                  │ tool calls:
+                                                  │ create_text, create_button,
+                                                  │ create_card, create_chart...
+                                                  ▼
+                                        ┌───────────────────────────┐
+                                        │  A2UI Bridge Server       │
+                                        │  (tool call → JSON)       │
+                                        │                           │
+                                        │  Assembles flat adjacency │
+                                        │  list of components       │
+                                        └─────────┬─────────────────┘
+                                                  │ serves via HTTP
+                                                  │
+                         ┌────────────────────────┼────────────────────────┐
+                         │                        │                        │
+                         ▼                        ▼                        ▼
+                  POST /rpc               GET /live (SSE)          POST /chat
+                  (full UI snapshot)      (real-time updates)      (new prompts)
+                         │                        │
+                         └────────┬───────────────┘
+                                  │
+                                  ▼
+                    ┌───────────────────────────────┐
+                    │  Makepad App                  │
+                    │                               │
+                    │  A2uiHost ──→ A2uiProcessor   │
+                    │                    │          │
+                    │              A2uiSurface      │
+                    │              (widget tree)    │
+                    │                    │          │
+                    │         ┌──────────┼────────┐ │
+                    │         ▼          ▼        ▼ │
+                    │      Labels    Buttons   Charts│
+                    │      Cards     Inputs    3D    │
+                    │      Lists     Sliders   Plots │
+                    │                               │
+                    │  GPU-accelerated native render │
+                    └───────────────────────────────┘
+```
+
+**Key points:**
+- **A2UI is declarative JSON** — no code execution, safe across trust boundaries
+- **Flat adjacency list** — LLM-friendly format, components reference each other by ID
+- **Tool-use pattern** — LLM calls structured tools (`create_text`, `create_chart`, etc.), the bridge assembles valid A2UI JSON
+- **Any OpenAI-compatible LLM works** — just needs tool/function calling support
 
 ### Data Flow
 
 ```
                           ┌──────────────────┐
- curl /chat ──────────────▶ Kimi Bridge:8081 │──────▶ Kimi K2.5 API
-                          │  (tool calls)    │◀──────  (tool_calls)
+ curl /chat ──────────────▶ A2UI Bridge      │──────▶ LLM API
+                          │  (port 8082)     │◀──────  (tool_calls)
                           └───────┬──────────┘
-                                  │ writes
-                                  ▼
-                          ┌──────────────────┐
-                          │  ui_live.json    │
-                          └───────┬──────────┘
-                                  │ watched by
-                                  ▼
-                          ┌──────────────────┐
-                          │ Watch Server:8080│──── SSE /rpc ──▶ Makepad App
-                          └──────────────────┘                (native UI)
+                                  │ serves A2UI JSON
+                                  │
+                         ┌────────┼────────┐
+                         ▼        ▼        ▼
+                    POST /rpc  GET /live  POST /chat
+                    (snapshot) (SSE push) (new prompts)
+                         │        │
+                         └───┬────┘
+                             ▼
+                      Makepad App (a2ui-demo)
+                      (native GPU-accelerated UI)
 ```
 
 ### A2UI Protocol Messages
