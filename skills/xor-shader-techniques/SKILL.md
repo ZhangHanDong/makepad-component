@@ -1,3 +1,21 @@
+---
+name: xor-shader-techniques
+description: |
+  Use when implementing shader effects like turbulence, fluid, fire, smoke,
+  procedural noise, starfields, volumetric rendering, raymarching, glow,
+  antialiasing, fractal texturing, or optimizing shader performance with cheap alternatives.
+  Triggers on: shader techniques, shader tricks, shader optimization,
+  turbulence shader, fluid shader, fire shader, smoke shader,
+  procedural noise, dot noise, gyroid noise,
+  efficient chaos, star field, particle scatter,
+  fractal texturing, LOD texturing, texture scaling,
+  volumetric rendering, raymarching, glow effects,
+  antialiasing, analytic antialiasing, fwidth,
+  shader performance, cheap shader effects,
+  GLSL tricks, shader math, shader formulas,
+  Xor shader, GM Shaders, mini.gmshaders.com
+---
+
 # Xor Shader Techniques
 
 Advanced shader programming techniques by Xor (@XorDev), covering efficient methods for procedural generation, noise, texturing, and visual effects.
